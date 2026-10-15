@@ -84,7 +84,9 @@ def italian_batch(tmp_path, records, *, accept=True):
 def translated(i, model=GPT):
     return {**item(i), "key": f"tr:harm:{i}:prompt", "origin": "translated", "source": "org/harm",
             "source_id": f"{i}#it", "provenance": {"kind": "translated", "entry": "harm",
-                                                   "translator": {"model_id": model}}}
+                                                   "translator": {
+                                                       "model_id": model, "provider": "together",
+                                                       "provider_model": model}}}
 
 
 def test_italian_batch_enters_only_with_an_accepted_spot_check(tmp_path):
@@ -112,6 +114,21 @@ def test_teacher_text_enters_only_through_an_admitted_teacher_entry(tmp_path, en
                           ("tr", [translated(i) for i in range(25)])):
         with pytest.raises(PoolError, match=match):
             load_italian(italian_batch(tmp_path / name, records), entries=entries)
+
+
+@pytest.mark.parametrize("writer", [
+    {"provider": "groq", "provider_model": GPT},
+    {"provider": "huggingface", "provider_model": GPT},  # router senza provider fissato
+    {"provider": "huggingface", "provider_model": f"{GPT}:fireworks-ai"},
+    {},
+])
+def test_teacher_text_from_a_provider_with_unverified_terms_is_refused(tmp_path, writer):
+    entries = entries_for(pool(1)) + [TEACHER]
+    records = [{**item(i), "provenance": {"kind": "generated",
+                                          "generator": {"model_id": GPT, **writer}}}
+               for i in range(25)]
+    with pytest.raises(PoolError, match="provider_not_verified"):
+        load_italian(italian_batch(tmp_path, records), entries=entries)
 
 
 def test_text_from_a_model_outside_the_teacher_registry_is_refused(tmp_path):

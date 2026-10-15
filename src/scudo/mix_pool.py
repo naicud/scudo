@@ -79,6 +79,24 @@ def _admitted(entries: list[Entry], name: str) -> Entry:
     return by_name[name]
 
 
+# Provider i cui termini lasciano usare gli output per addestrare e pubblicare un
+# modello (docs/research/teacher-providers-2026-10-15.md); gli altri non sono verificati.
+VERIFIED_PROVIDERS = frozenset({"deepinfra", "together", "scaleway"})
+
+
+def serving_provider(provider: str, provider_model: str = "") -> str:
+    """Chi ha servito il modello: il suffisso `:provider` del router HF, altrimenti `provider`."""
+    if ":" in provider_model:
+        return provider_model.rsplit(":", 1)[1].lower()
+    return provider.lower()
+
+
+def provider_problem(writer: dict) -> str | None:
+    provider = serving_provider(str(writer.get("provider") or ""),
+                                str(writer.get("provider_model") or ""))
+    return None if provider in VERIFIED_PROVIDERS else "provider_not_verified"
+
+
 def teacher_problem(entries: list[Entry], model_id) -> str | None:
     """Perché i testi di `model_id` non entrano, o None: teacher del registro con voce ammessa."""
     if not isinstance(model_id, str) or model_id not in CANDIDATES:
@@ -96,7 +114,9 @@ def _teacher(entries: list[Entry], record: dict) -> Entry:
     writer = record["provenance"].get(
         "translator" if record["origin"] == "translated" else "generator")
     model_id = writer.get("model_id") if isinstance(writer, dict) else None
-    if problem := teacher_problem(entries, model_id):
+    problem = teacher_problem(entries, model_id) or provider_problem(
+        writer if isinstance(writer, dict) else {})
+    if problem:
         raise PoolError(f"{record['key']}: testo di {model_id!r}: {problem}")
     return next(entry for entry in training(entries) if entry.id == model_id)
 

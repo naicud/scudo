@@ -47,10 +47,16 @@ un dataset sul Hub: i testi stanno in lotti fuori dal repository, e ogni lotto
 è già fissato dal suo sha256 (pool legato allo spot-check e registrato nel
 manifest del mix). Licenza `apache-2.0`, quella dei modelli, che non limita gli
 output; gli split sono i tre tipi di testo (`generated`, `translated`,
-`reasoning`). I termini del provider non sono fissati dal codice (il provider
-si sceglie per run nel TOML del teacher), quindi restano `INCERTO`: la nota
-riassume la [ricerca sui provider](research/teacher-providers-2026-10-15.md) e
-la decisione (ad esempio quali provider ammettere) spetta alla persona.
+`reasoning`). I termini dei generatori restano `INCERTO` con una decisione del
+responsabile (2026-10-15) che ammette solo testi serviti da provider con termini
+verificati compatibili, secondo la
+[ricerca sui provider](research/teacher-providers-2026-10-15.md): DeepInfra,
+Together, Scaleway (`scudo.mix_pool.VERIFIED_PROVIDERS`). Il codice lo applica:
+il provider che ha servito il testo è il suffisso `:provider` del modello
+richiesto al router Hugging Face (es. `openai/gpt-oss-120b:deepinfra`),
+altrimenti il campo `provider` del TOML; un lotto o un ragionamento senza
+provider verificato resta fuori (`provider_not_verified`). Il router senza
+provider fissato non basta, perché sceglie da solo il provider.
 
 Un testo del teacher entra solo se il modello è nel registro e la sua voce
 esiste, ha la stessa revisione del registro e passa il cancello

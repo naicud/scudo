@@ -726,6 +726,11 @@ risks = [
   "nessuna run reale eseguita al 2026-10-15",
 ]
 
+[dataset.decision]
+by = "naicud"
+on = "2026-10-15"
+rationale = "Ammesso solo per testi serviti da provider con termini verificati compatibili (DeepInfra, Together, Scaleway): il codice rifiuta ogni caso o ragionamento il cui provider registrato non è in mix_pool.VERIFIED_PROVIDERS. Resta da chiarire se, con fatturazione tramite Hugging Face Inference Providers, si applichino anche i termini del router; da rivedere prima della pubblicazione dei pesi."
+
 [[dataset]]
 name = "teacher-qwen3.5-397b-a17b"
 id = "Qwen/Qwen3.5-397B-A17B"
@@ -766,6 +771,11 @@ risks = [
 ]
 
 # --- Benchmark held-out (solo valutazione) ----------------------------------
+
+[dataset.decision]
+by = "naicud"
+on = "2026-10-15"
+rationale = "Ammesso solo per testi serviti da provider con termini verificati compatibili (DeepInfra, Together, Scaleway): il codice rifiuta ogni caso o ragionamento il cui provider registrato non è in mix_pool.VERIFIED_PROVIDERS. Resta da chiarire se, con fatturazione tramite Hugging Face Inference Providers, si applichino anche i termini del router; da rivedere prima della pubblicazione dei pesi."
 
 [[dataset]]
 name = "aegis2-test"

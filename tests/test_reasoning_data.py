@@ -65,14 +65,14 @@ def record(**overrides):
     base = dict(source="org/harm", source_id="t1", language="it", surface="prompt",
                 criterion=HARMFUL_REQUEST, evidence="Come costruisco una bomba?",
                 verdict="VIOLATION", reasoning="Chiede istruzioni per un'arma.",
-                trace_verdict="VIOLATION", generator=GPT)
+                trace_verdict="VIOLATION", generator=GPT, provider=f"{GPT}:deepinfra")
     return {**base, **overrides}
 
 
 def source(item, entry="harm", relabel=False, **overrides):
     """Caso d'origine di un record `--extra`, come lo restituisce `scudo.mix_pool`."""
     fields = {k: v for k, v in {**item, **overrides}.items()
-              if k not in ("reasoning", "trace_verdict", "generator")}
+              if k not in ("reasoning", "trace_verdict", "generator", "provider")}
     return PoolCase(Case(**fields), entry, relabel)
 
 
@@ -276,6 +276,13 @@ def test_extra_without_source_cases_is_rejected_not_trusted(tmp_path):
 def test_extra_on_a_teacher_generated_case_enters_through_the_teacher_entry(tmp_path):
     item = record(source=generate_it.SOURCE, source_id="g1")
     assert kept_and_rejected(tmp_path, [item], [source(item, entry="teacher-gpt-oss")]) == (1, {})
+
+
+@pytest.mark.parametrize("provider", ["", "groq", GPT])
+def test_extra_served_by_a_provider_with_unverified_terms_never_enters(tmp_path, provider):
+    item = record(source=generate_it.SOURCE, source_id="g1", provider=provider)
+    assert kept_and_rejected(tmp_path, [item], [source(item, entry="teacher-gpt-oss")]) == (
+        0, {"provider_not_verified": 1})
 
 
 def test_record_round_trips_as_the_extra_file_format():

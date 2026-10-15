@@ -12,7 +12,9 @@ def item(i, language="it"):
             "source_id": f"s{i}", "language": language, "surface": "prompt",
             "criterion": "Is it unsafe?", "evidence": f"Testo numero {i}\ncon a capo",
             "verdict": "VIOLATION",
-            "provenance": {"kind": "generated", "generator": {"model_id": "openai/gpt-oss-120b"}}}
+            "provenance": {"kind": "generated", "generator": {
+                "model_id": "openai/gpt-oss-120b", "provider": "huggingface",
+                "provider_model": "openai/gpt-oss-120b:deepinfra"}}}
 
 
 def pool(tmp_path, n_it=30, n_mixed=1):

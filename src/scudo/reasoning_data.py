@@ -43,7 +43,7 @@ from scudo.cases import Case
 from scudo.dedup import Index
 from scudo.ingest import DEDUP_PARAMS, benchmark_index, check_outside_repo, load_rows, manifest_digest
 from scudo.manifest import Entry, ManifestError, benchmarks, gate, load, problems, training
-from scudo.mix_pool import PoolCase, load_ingest, load_italian, teacher_problem
+from scudo.mix_pool import PoolCase, load_ingest, load_italian, provider_problem, teacher_problem
 from scudo.protocol import SEMANTIC_IDS
 from scudo.reasoned import REASONED_FORMAT_VERSION, check_reasoning, reasoned_training_row
 
@@ -82,6 +82,7 @@ class ReasoningRecord:
     reasoning: str
     trace_verdict: str  # verdetto a cui arriva il ragionamento
     generator: str  # modello che ha scritto il ragionamento
+    provider: str = ""  # teacher: chi l'ha servito, es. `openai/gpt-oss-120b:deepinfra`
 
     def __post_init__(self):
         if not all(isinstance(getattr(self, f.name), str) for f in fields(self)):
@@ -177,6 +178,8 @@ def source_index(cases: Iterable[PoolCase]) -> dict:
 def extra_problem(item: ReasoningRecord, entries: list[Entry], sources: dict) -> str | None:
     """Perché un record `--extra` resta fuori, o None: teacher, fonte e verdetto verificati."""
     if reason := teacher_problem(entries, item.generator):
+        return reason
+    if reason := provider_problem({"provider": item.provider, "provider_model": item.provider}):
         return reason
     found = sources.get(_key(item.case()))
     if found is None:
