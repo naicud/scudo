@@ -37,7 +37,10 @@ from pathlib import Path
 EVAL = {
     "checkpoint_repo": "Naicud/scudo-checkpoints",  # privato: report in eval/<scudo_sha>/
     "report_dir": "/content/eval-reports",
-    "seed": 3407,  # permutazione delle opzioni del Fast
+    "seed": 3407,  # permutazione delle opzioni del Fast e campione dei benchmark
+    # Casi per benchmark, campione deterministico con `seed` (benchmarks.sample): stessi
+    # casi per ogni modello. Le baseline generative costano una generazione per caso.
+    "per_benchmark": 500,
     # Report della build di ingestione (`python -m scudo.ingest build`), in un repository
     # privato a un commit fissato. Vuoto: verifica della deduplica NOT_RUN nei report.
     "ingest_report": {"repo": "", "repo_type": "dataset", "revision": "", "path": "report.json"},
@@ -46,7 +49,7 @@ EVAL = {
         "base_model": "Qwen/Qwen3.5-4B",
         "base_revision": "@FAST_BASE_REVISION@",
         "adapter_repo": "Naicud/scudo-checkpoints",
-        "adapter_revision": "",
+        "adapter_revision": "e7124a687ce3721a29bfb6b68a461357c0400659",  # tracer #2
         "adapter_dir": "adapter",
         "max_seq_length": 2048,
     },
@@ -75,7 +78,7 @@ print(json.dumps(DEDUP, indent=2, ensure_ascii=False))"""
 DATA = """\
 from functools import partial
 
-from scudo.benchmarks import BenchmarkError, load_cases
+from scudo.benchmarks import BenchmarkError, load_cases, sample
 from scudo.ingest import load_rows
 from scudo.manifest import benchmarks
 
@@ -83,8 +86,9 @@ loader = partial(load_rows, cache_dir=Path(CACHE_DIR))
 LOADED, REFUSED = {}, {}
 for entry in benchmarks():
     try:
-        LOADED[entry.name] = load_cases(entry, loader)
-    except BenchmarkError as error:  # rifiuto prima di qualsiasi download (es. WildGuardTest)
+        full = load_cases(entry, loader)
+        LOADED[entry.name] = sample(full, EVAL["per_benchmark"], seed=EVAL["seed"])
+    except BenchmarkError as error:  # rifiuto prima di qualsiasi download
         REFUSED[entry.name] = str(error)
 for name, loaded in LOADED.items():
     print(json.dumps(loaded.summary(), ensure_ascii=False))

@@ -293,3 +293,9 @@ per ultimo (Unsloth modifica transformers all'import), riepilogo. I report
 vanno in `Naicud/scudo-checkpoints` sotto `eval/<scudo_sha>/<modello>/`; il
 riepilogo per l'issue elenca verifica della deduplica, benchmark rifiutati,
 modelli saltati con il motivo e metriche principali.
+
+Ogni benchmark si valuta su un campione deterministico di `EVAL["per_benchmark"]`
+casi (default 500, `benchmarks.sample` con `EVAL["seed"]`): stessi casi per ogni
+modello, così i report si confrontano caso per caso e il run con le baseline
+generative sta in una sessione Colab. `rows` e `dropped` restano quelli del
+benchmark intero.

@@ -65,3 +65,14 @@ def test_eval_notebook_never_embeds_tokens():
     serialized = json.dumps(build())
     assert "hf_" not in serialized.replace("hf_hub", "").replace("hf_token", "")
     assert 'userdata.get("HF_TOKEN")' in text()
+
+
+def test_benchmarks_are_sampled_per_benchmark_with_a_seed():
+    source = "\n".join(code_cells(build()))
+    assert '"per_benchmark": 500' in source
+    assert "sample(full, EVAL[\"per_benchmark\"], seed=EVAL[\"seed\"])" in source
+
+
+def test_fast_points_at_the_tracer_adapter_upload():
+    assert '"adapter_revision": "e7124a687ce3721a29bfb6b68a461357c0400659"' in "\n".join(
+        code_cells(build()))
