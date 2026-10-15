@@ -35,6 +35,13 @@ error)`: un readout oppure un errore, mai entrambi. Un errore (timeout, uscita
 illeggibile, readout malformato) entra nella colonna `ERROR` della matrice di
 confusione e conta come sbaglio; non diventa mai `NO_VIOLATION`.
 
+Eccezione: l'errore `UNSUPPORTED` segnala una capacità che il modello non copre
+(es. una superficie che la baseline non può vedere). Quei casi restano fuori da
+tutte le metriche e ogni gruppo li conta in `unsupported`; un gruppo fatto solo
+di casi non supportati riporta `{"cases": 0, "unsupported": n}`. Così le
+metriche di una baseline restano confrontabili sulle superfici che copre, e il
+numero di casi scoperti resta visibile.
+
 - **`accuracy`**: verdetti uguali al gold diviso tutti i casi, errori inclusi.
 - **`precision`, `recall`, `f1`** per verdetto: precision = corretti /
   predetti con quel verdetto; recall = corretti / gold con quel verdetto (gli

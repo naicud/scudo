@@ -97,3 +97,13 @@ def test_build_is_deterministic(tmp_path):
     assert first == second
     assert Path(tmp_path / "a" / "aegis2-train.jsonl").read_bytes() == Path(
         tmp_path / "b" / "aegis2-train.jsonl").read_bytes()
+
+
+def test_attributions_list_only_sources_that_produced_data(tmp_path):
+    from scudo.ingest import write_cards
+
+    cc_by = replace(TRAIN, name="cc-by-train", license="cc-by-4.0")
+    write_cards(tmp_path, [cc_by, HELD], {})
+    assert cc_by.title not in (tmp_path / "data-cards" / "ATTRIBUTIONS.md").read_text()
+    write_cards(tmp_path, [cc_by, HELD])  # solo manifest: tutte le fonti di training
+    assert cc_by.title in (tmp_path / "data-cards" / "ATTRIBUTIONS.md").read_text()

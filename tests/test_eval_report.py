@@ -234,3 +234,22 @@ def test_live_proof_requires_gguf_weights_only():
         build([result("en", "VIOLATION", "VIOLATION")], proof="live", weights=[adapter])
     with pytest.raises(ValueError):
         build([result("en", "VIOLATION", "VIOLATION")], proof="live", weights=[MODEL, adapter])
+
+
+def unsupported(language, gold, surface="response"):
+    return EvalResult(f"{language}-{surface}-unsupported", language, surface, gold, None,
+                      error="UNSUPPORTED")
+
+
+def test_unsupported_capability_is_reported_apart_not_as_an_error():
+    report = build([result("en", "VIOLATION", "VIOLATION"), unsupported("en", "NO_VIOLATION")])
+    assert report["overall"]["accuracy"] == 1.0
+    assert report["overall"]["cases"] == 1
+    assert report["overall"]["errors"] == 0
+    assert report["overall"]["unsupported"] == 1
+    assert report["by_surface"]["response"] == {"cases": 0, "unsupported": 1}
+
+
+def test_report_with_only_unsupported_results_is_rejected():
+    with pytest.raises(ValueError):
+        build([unsupported("en", "VIOLATION")])

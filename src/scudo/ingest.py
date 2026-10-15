@@ -99,13 +99,13 @@ def _ingest(entry: Entry, converter, loader: Loader, index: Index, path: Path) -
 
 
 def write_cards(out: Path, entries: list[Entry], stats: dict | None = None) -> None:
-    stats = stats or {}
+    """`stats` None: schede dal solo manifest; altrimenti attribuzioni solo per le fonti con dati."""
     cards = out / "data-cards"
     cards.mkdir(parents=True, exist_ok=True)
     for entry in entries:
-        card = datacard.render(entry, stats.get(entry.name))
+        card = datacard.render(entry, (stats or {}).get(entry.name))
         (cards / f"{entry.name}.md").write_text(card, encoding="utf-8")
-    used = [e for e in training(entries) if not stats or e.name in stats]
+    used = [e for e in training(entries) if stats is None or e.name in stats]
     (cards / "ATTRIBUTIONS.md").write_text(datacard.attributions(used), encoding="utf-8")
 
 

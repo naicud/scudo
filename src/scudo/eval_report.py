@@ -23,6 +23,7 @@ from scudo.protocol import FORMAT_VERSION, SEMANTIC_IDS, Readout, Verdict
 ProofType = Literal["local", "live", "reference"]
 PROOF_TYPES: tuple[ProofType, ...] = ("local", "live", "reference")
 ERROR = "ERROR"
+UNSUPPORTED = "UNSUPPORTED"  # capacità che il modello non copre: contata a parte, fuori dalle metriche
 ECE_BINS = 10  # bin di uguale ampiezza su [0, 1]
 _SHA = re.compile(r"[0-9a-f]{40}")
 
@@ -123,11 +124,19 @@ def _metrics(results: Sequence[EvalResult]) -> dict:
     }
 
 
+def _summary(results: Sequence[EvalResult]) -> dict:
+    supported = [item for item in results if item.error != UNSUPPORTED]
+    unsupported = len(results) - len(supported)
+    if not supported:
+        return {"cases": 0, "unsupported": unsupported}
+    return {**_metrics(supported), "unsupported": unsupported}
+
+
 def _grouped(results: Sequence[EvalResult], key: Callable[[EvalResult], str]) -> dict:
     groups = defaultdict(list)
     for item in results:
         groups[key(item)].append(item)
-    return {name: _metrics(items) for name, items in sorted(groups.items())}
+    return {name: _summary(items) for name, items in sorted(groups.items())}
 
 
 def build_report(
@@ -158,7 +167,7 @@ def build_report(
         raise ValueError("runtime: servono name e version non vuoti")
     if not model or not format:
         raise ValueError("modello e formato sono obbligatori")
-    if not results:
+    if all(item.error == UNSUPPORTED for item in results):
         raise ValueError("nessun risultato da riportare")
     if any(item.gold not in SEMANTIC_IDS for item in results):
         raise ValueError("gold fuori dal contratto tri-state")
@@ -171,7 +180,7 @@ def build_report(
         "format": format,
         "split": split,
         "harness": harness,
-        "overall": _metrics(results),
+        "overall": _summary(results),
         "by_language": _grouped(results, lambda item: item.language),
         "by_surface": _grouped(results, lambda item: item.surface),
     }
