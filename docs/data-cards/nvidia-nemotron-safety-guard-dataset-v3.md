@@ -42,8 +42,8 @@ senza data card completa non entra nel manifest.
     (voce `aegis2-train` di `src/scudo/manifest.toml`).
   - Sottoinsieme `refusal_data_augmentation` (rifiuti generati con Gemma-2-27B in Aegis
     2.0): soggetto ai termini Gemma. Escluso dal tracer.
-  - Pipeline CultureGuard: licenze dei modelli e del traduttore non verificate (vedi
-    «Generatore e teacher»).
+  - Pipeline CultureGuard: licenze dei modelli e termini del traduttore letti il
+    2026-10-15 (vedi «Generatore e teacher»).
 
 Ammesse: Apache-2.0, MIT, CC0, CC-BY, ODC-BY. Escluse: NC, CC-BY-SA, gated con
 termini propri, dati generati o distillati da modelli con licenza che limita
@@ -53,29 +53,46 @@ uso o training.
 
 - Testi scritti da: misto. Il README dichiara dati generati sinteticamente con la
   pipeline CultureGuard, che adatta culturalmente e traduce il dataset Aegis 2.0 di
-  NVIDIA, e aggiunge prompt jailbreaking sintetici. Il modello che genera o adatta i
-  testi non è dichiarato nel README. Secondo la nota di ricerca, i prompt di Aegis 2.0
-  derivano da fonti umane (HH-RLHF, DAN, AART) e le risposte di Aegis 2.0 da
-  Mistral-7B-v0.1.
+  NVIDIA, e aggiunge prompt jailbreaking sintetici. Il paper (arXiv:2508.01710v4,
+  §3.1-3.2) nomina i modelli: Llama-3.1-Nemotron-70B-Instruct sceglie le righe da
+  adattare, Mixtral-8x22B le adatta, Mixtral-8x7B scrive i prompt jailbreaking e
+  Mixtral-8x22B le loro risposte; ogni testo non inglese è tradotto con Google Cloud
+  Translation («translated into the chosen target languages using Google Translate ...
+  Google Cloud Platform (GCP) translation», §3.1.3). I prompt di Aegis 2.0 derivano da
+  fonti umane (HH-RLHF, DAN, AART) e le risposte da Mistral-7B-v0.1.
 - Label prodotte da: misto. Conteggi `prompt_label_source` (train): umani 333.026,
   `llm_jury` 118.398. Conteggi `response_label_source` (train): umani 51.340,
-  `llm_jury` 219.122, `refusal_data_augmentation` 11.608. Il README non dichiara quali
-  modelli compongono la giuria. Secondo la nota di ricerca, la pipeline CultureGuard usa
-  come giuria di filtro Llama-Nemotron-Safety-Guard-V2, PolyGuard-Qwen,
-  Llama-3.1-Nemotron-70B e Qwen3-235B (citazione [cg]); per le label di Aegis 2.0 la
-  nota cita Mixtral-8x22B, Mistral-NeMo-12B e Gemma-2-27B. Che questa giuria abbia
-  prodotto le label di Nemotron v3 è un'inferenza della nota, non verificata nel README.
+  `llm_jury` 219.122, `refusal_data_augmentation` 11.608. Secondo il paper, le label
+  delle righe jailbreaking sono il voto della giuria Llama-Nemotron-Safety-Guard-V2
+  (`nvidia/llama-3.1-nemoguard-8b-content-safety`), PolyGuard-Qwen,
+  Llama-3.1-Nemotron-70B-Instruct e Qwen3-235B-A22B, tenute solo se la maggioranza
+  coincide con Qwen3-235B (§3.2); le righe adattate tengono la label originale solo se
+  la giuria concorda (§3.1.2). Dopo la traduzione, Llama-Nemotron-Safety-Guard-V2
+  scarta le righe la cui label cambia in back-translation e un giudice FAITH non
+  nominato scarta le traduzioni sotto 3,5/5 (§3.1.4). GPT-4o serve solo a valutare
+  segregazione e adattamento.
 - Teacher usati da noi (traduzione, generazione, ragionamenti), con licenza: nessuno nel
   tracer #2, che seleziona, filtra e mappa le righe senza generare, tradurre o
   ragionare. Licenza: non applicabile.
-- Termini d'uso dei generatori compatibili con il training: INCERTO. Motivi:
-  - Traduzione: la nota di ricerca indica Google Translate come traduttore del dataset;
-    i termini di Google Translate per questo uso sono NON VERIFICATI.
-  - Modelli Llama della giuria: la nota riporta i vincoli della licenza Llama 3 (divieto
-    di usare gli output per migliorare altri LLM) e della licenza Llama 3.1 (obbligo di
-    anteporre «Llama» ai modelli distribuiti addestrati con i suoi output). Non è
-    verificato se e come si applichino a questo dataset.
-  - Qwen3-235B e Llama-3.1-Nemotron-70B: licenze non verificate.
+- Termini d'uso dei generatori compatibili con il training: INCERTO (letti il
+  2026-10-15). Mixtral (apache-2.0), Qwen3-235B-A22B (apache-2.0) e PolyGuard-Qwen
+  (cc-by-4.0) non limitano gli output. Restano due punti aperti:
+  - Traduzione: Cloud Translation API è elencata tra le «AI/ML Services»
+    (https://cloud.google.com/terms/services). I Service Specific Terms (versione del
+    12/10/2026, §17) dicono «Customer will not, and will not allow End Users to use an
+    AI/ML Service or Generated Output to develop a similar or competing product or
+    service» e vietano di usare l'output per «create or improve models similar to a
+    Google Model». Non è stabilito se il vincolo di NVIDIA passi a chi riceve il dataset
+    CC BY, se un guard sia «similar to a Google Model», né quali termini valevano al
+    momento della traduzione (2025).
+  - Modelli Llama: Llama-Nemotron-Safety-Guard-V2 e Llama-3.1-Nemotron-70B-Instruct
+    sono derivati Llama 3.1 («Built with Llama»). La licenza Llama 3.1, §1.b.i: «If you
+    use the Llama Materials or any outputs or results of the Llama Materials to create,
+    train, fine tune, or otherwise improve an AI model, which is distributed or made
+    available, you shall also include “Llama” at the beginning of any such AI model
+    name». Le loro label `llm_jury` sono marcate `needs_relabel` e non entrano come
+    gold; restano il loro ruolo di filtro sulle righe tradotte e adattate e la domanda
+    se un filtro sia «results ... to create, train» per chi non è licenziatario Llama.
   - Sottoinsieme Gemma (rifiuti di Aegis 2.0): escluso dal tracer.
 
 ## Trasformazioni e filtri
@@ -111,11 +128,12 @@ uso o training.
     seed, id e superficie).
 - Traduzione: traduttore, controllo a campione, back-translation:
   - Il tracer non traduce.
-  - Traduttore del dataset: la nota di ricerca indica Google Translate; il README non lo
+  - Traduttore del dataset: Google Cloud Translation (paper, §3.1.3); il README non lo
     dichiara.
   - Controllo a campione da madrelingua: non dichiarato.
-  - Back-translation: la nota di ricerca cita per CultureGuard un filtro di coerenza con
-    back-translation [cg]; non verificato nel README.
+  - Back-translation: il paper (§3.1.4) descrive un filtro di coerenza con
+    back-translation (label di Llama-Nemotron-Safety-Guard-V2) e un filtro FAITH; il
+    README non lo dichiara.
   - Per l'italiano, la nota segnala che il testo è tradotto a macchina, non nativo.
 - Righe scartate e motivo:
   - Nel tracer, i conteggi per filtro non sono registrati.

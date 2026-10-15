@@ -45,10 +45,10 @@ Stato con il manifest del 2026-10-15: oggi produce casi solo `aegis2-train`
 (CC-BY-4.0, ammessa; convertitore `scudo.aegis`), quindi è l'unica fonte
 traducibile. Le altre fonti ammesse dal cancello non hanno ancora un
 convertitore; quelle con termini `INCERTO` (`nemotron3-train`,
-`nemotron-sft-safety-v2`, `deepset-prompt-injections`,
-`gandalf-ignore-instructions`, `yanismiraoui-prompt-injections`,
-`nemotron-rl-indirect-injection`) sono bloccate finché una persona non scrive
-la decisione. `plan-meta.json` registra lo stato di ogni fonte incontrata e gli
+`deepset-prompt-injections`, `gandalf-ignore-instructions`,
+`yanismiraoui-prompt-injections`) sono bloccate finché una persona non scrive
+la decisione; `nemotron-sft-safety-v2` ha termini `NO` (italiano tradotto con
+Riva-Translate, licenza che vieta di usarne gli output per altri modelli). `plan-meta.json` registra lo stato di ogni fonte incontrata e gli
 scarti per motivo.
 
 **Traduttore**: è il teacher del pilot; la run rifiuta un modello del registro

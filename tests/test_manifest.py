@@ -135,9 +135,8 @@ def test_every_converted_training_source_is_in_the_manifest():
     assert set(UNCONVERTED) <= trained
 
 
-def test_open_jev_is_blocked_until_a_human_decides_on_its_teacher():
-    [problem] = [p for p in problems(load()) if p.startswith("open-jev-train:")]
-    assert "INCERTO" in problem
+def test_open_jev_passes_the_gate_once_its_procedural_teacher_is_verified():
+    assert not [p for p in problems(load()) if p.startswith("open-jev-train:")]
 
 
 def test_registry_lists_the_held_out_benchmarks():

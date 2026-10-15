@@ -72,7 +72,7 @@ smoke locale del 15 ottobre 2026 sugli stessi file.
 | `in-the-wild-jailbreak` | `in_the_wild` | `jailbreak` vero: `injection_direct` VIOLATION | 1.405 VIOLATION |
 | `in-the-wild-regular` | `in_the_wild` | `jailbreak` falso: NO_VIOLATION, `needs_relabel` (negativo per assenza del tag, spesso role-play vicino ai jailbreak) | 13.735 NO_VIOLATION da rietichettare |
 | `jackhhao-jailbreak` | `jackhhao` | solo `type = jailbreak`: VIOLATION; benigni OpenOrca/GPTeacher fuori | 1.044 righe: 527 VIOLATION, 517 benigni scartati |
-| `open-jev-train`, `canttalk-train`, `procedural-train` | `open_jev`, `canttalk`, `procedural` | vedi [criteri personalizzati](criteri-personalizzati.md); `open-jev-train` è bloccato dal cancello (teacher non dichiarato) | vedi il documento |
+| `open-jev-train`, `canttalk-train`, `procedural-train` | `open_jev`, `canttalk`, `procedural` | vedi [criteri personalizzati](criteri-personalizzati.md); `open-jev-train` passa il cancello (generatori procedurali, nessun LLM) | vedi il documento |
 
 Non convertite, con il motivo in `not_ingested`: `civil-comments` (punteggi di
 tossicità, non label di policy; domanda ai valutatori e soglia non nel README,

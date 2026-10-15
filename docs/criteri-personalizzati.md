@@ -17,7 +17,7 @@ schema letto da datasets-server e dai file grezzi alla stessa revisione.
 
 | Dataset | Config | Revisione | Licenza | Generatore e label |
 | --- | --- | --- | --- | --- |
-| `ZefanCai/Open-Jev` | `release-v2-redistributable` | `c67699e13d0ae25e35b77165a4b6b079bedc8aba` | CC0-1.0 (record generati), codice MIT | sintetico/procedurale del progetto Open-Jev; label da regole, oracoli programmatici o script expert; teacher LLM non dichiarato (NON VERIFICATO) |
+| `ZefanCai/Open-Jev` | `release-v2-redistributable` | `c67699e13d0ae25e35b77165a4b6b079bedc8aba` | CC0-1.0 (record generati), codice MIT | sintetico/procedurale del progetto Open-Jev; label da regole, oracoli programmatici o script expert; il «teacher» è uno script, nessun LLM nei generatori (codice letto alla revisione, 2026-10-15) |
 | `nvidia/CantTalkAboutThis-Topic-Control-Dataset` | `mixtral` | `b015ae8902d8429ce32ebfed9f9935f891d10ed5` | CC-BY-4.0 | dialoghi e distrattori di train da Mixtral-8x7B-Instruct (Apache-2.0); distrattori del test scritti da due esperti (paper) |
 | `tasksource/procedural-typed-decisions` | `all` | `e4b21b7b55f6cc9e76e33563e9d604ac5fcd25ad` | Apache-2.0 | generazione procedurale deterministica, nessun LLM; risposte calcolate esattamente dallo stato |
 

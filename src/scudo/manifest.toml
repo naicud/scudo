@@ -106,20 +106,22 @@ surfaces = ["prompt", "response"]
 license = "cc-by-4.0"
 license_source = "API cardData.license e README (License/Terms of Use)"
 gated = false
-texts_by = "pipeline CultureGuard su Aegis 2.0: adattamento culturale con Mixtral-8x22B, traduzione con Google Translate (GCP), prompt jailbreaking sintetici (paper arXiv:2508.01710)"
-labels_by = "prompt_label_source e response_label_source: human, llm_jury, refusal_data_augmentation; giuria CultureGuard: Llama-Nemotron-Safety-Guard-V2, PolyGuard-Qwen, Llama-3.1-Nemotron-70B-Instruct, Qwen3-235B-A22B (paper)"
+texts_by = "pipeline CultureGuard su Aegis 2.0 (paper arXiv:2508.01710v4, §3.1-3.2): righe generic tradotte; righe adapted riscritte da Mixtral-8x22B e poi tradotte; jailbreak scritti con Mixtral-8x7B e risposte di Mixtral-8x22B; ogni testo non inglese tradotto con Google Cloud Translation («translated into the chosen target languages using Google Translate ... Google Cloud Platform (GCP) translation», §3.1.3)"
+labels_by = "prompt_label_source e response_label_source: human, llm_jury, refusal_data_augmentation. Le label llm_jury (righe jailbreaking) sono il voto della giuria Llama-Nemotron-Safety-Guard-V2, PolyGuard-Qwen, Llama-3.1-Nemotron-70B-Instruct, Qwen3-235B-A22B, tenute solo se la maggioranza coincide con Qwen3-235B (§3.2); le righe adapted tengono la label originale solo se la giuria concorda (§3.1.2)"
 generators = [
-  "mistralai/Mixtral-8x22B-v0.1 (apache-2.0): adattamento culturale",
-  "Google Translate / GCP: traduzione; termini per questo uso NON VERIFICATI",
-  "Llama-3.1-Nemotron-70B-Instruct (licenza Llama 3.1): classificazione culturale e giuria",
-  "Llama-Nemotron-Safety-Guard-V2 (base Llama 3.1): giuria",
-  "PolyGuard-Qwen: giuria; licenza NON VERIFICATA",
-  "Qwen3-235B-A22B: giuria; licenza NON VERIFICATA",
-  "modello dei prompt jailbreaking sintetici: NON VERIFICATO",
-  "Gemma-2-27B: righe refusal_data_augmentation ereditate da Aegis 2.0",
+  "mistralai/Mixtral-8x22B (apache-2.0): adattamento culturale e risposte dei jailbreak (testo)",
+  "Mixtral-8x7B (apache-2.0): prompt jailbreaking (testo)",
+  "Google Cloud Translation API: tutto il testo non inglese, italiano compreso (testo); elencata tra le «AI/ML Services» di https://cloud.google.com/terms/services",
+  "nvidia/llama-3.1-nemoguard-8b-content-safety (= Llama-Nemotron-Safety-Guard-V2; NVIDIA Open Model License più Llama 3.1, «Built with Llama»): giuria (label llm_jury) e filtro di coerenza dopo back-translation (scarta righe)",
+  "nvidia/Llama-3.1-Nemotron-70B-Instruct (license: llama3.1; NVIDIA Open Model License più Llama 3.1): segregazione culturale (sceglie le righe da adattare) e giuria (label llm_jury)",
+  "ToxicityPrompts/PolyGuard-Qwen (cc-by-4.0): giuria (label llm_jury)",
+  "Qwen/Qwen3-235B-A22B (apache-2.0): giuria e arbitro del filtro jailbreak (label llm_jury)",
+  "giudice FAITH delle traduzioni: modello non nominato (prompt in formato Llama 3.1, paper Fig. 10); solo filtro, soglia 3,5/5",
+  "GPT-4o: solo valutazione di segregazione e adattamento (§3.1.1-3.1.2); nessuna riga scartata dichiarata",
+  "Gemma-2-27B: righe refusal_data_augmentation ereditate da Aegis 2.0, escluse dal filtro",
 ]
 generator_terms = "INCERTO"
-generator_terms_note = "La licenza Llama 3.1 vincola i modelli addestrati con i suoi output (nome con prefisso «Llama»); i termini di Google Translate e le licenze di PolyGuard-Qwen, Qwen3-235B e del generatore dei jailbreak non sono verificati. Serve una decisione umana."
+generator_terms_note = "Fonti primarie lette il 2026-10-15. Mixtral, Qwen3 (apache-2.0) e PolyGuard-Qwen (cc-by-4.0) non limitano gli output. Restano due clausole che le fonti non chiudono. (1) Il testo italiano è output di Google Cloud Translation API; i Service Specific Terms GCP (versione del 12/10/2026, §17 «Use Restrictions for AI/ML Services», https://cloud.google.com/terms/service-terms) dicono «Customer will not, and will not allow End Users to use an AI/ML Service or Generated Output to develop a similar or competing product or service» e vietano di usare l'output «to: ... (ii) create or improve models similar to a Google Model» (Google Pre-Trained Model = «a model trained by Google and not released as an open model»). Non stabilito: se il vincolo del cliente (NVIDIA) passi a chi riceve il dataset CC BY, se un guard sia «similar to a Google Model», e quali termini valevano alla traduzione (2025, non letti). (2) Llama 3.1 §1.b.i (https://github.com/meta-llama/llama-models/blob/main/models/llama3_1/LICENSE): «If you use the Llama Materials or any outputs or results of the Llama Materials to create, train, fine tune, or otherwise improve an AI model, which is distributed or made available, you shall also include “Llama” at the beginning of any such AI model name». I modelli Llama hanno scritto le label llm_jury (marcate needs_relabel, mai gold) e filtrato le righe tradotte e adattate: se un filtro sia «results ... to create, train» per chi non è licenziatario Llama non è stabilito. Serve una decisione umana."
 filters = [
   "lingue it e en",
   "righe refusal_data_augmentation escluse per intero",
@@ -135,6 +137,7 @@ risks = [
   "italiano tradotto a macchina, non nativo",
   "label llm_jury: 26% dei prompt e 78% delle risposte etichettate del train",
   "le righe del test hanno gli stessi id del test di Aegis 2.0",
+  "se la clausola Llama 3.1 si applicasse, il nome del modello pubblicato dovrebbe iniziare con «Llama»",
 ]
 
 [[dataset]]
@@ -150,20 +153,23 @@ surfaces = ["prompt", "injection_direct", "over_refusal"]
 license = "cc-by-4.0"
 license_source = "README («governed by ... CC BY 4.0»; «Additional Information: Apache 2.0 License; MIT License»); API cardData.license = [cc-by-4.0, apache-2.0, mit]"
 gated = false
-texts_by = "prompt da Aegis 2.0, gretel-safety-alignment-en-v1, notadib/harmful-tasks (mit) e sottoinsiemi sintetici sdg_*; risposte rigenerate; traduzione IT con nvidia/Riva-Translate-4B-Instruct-v1.1"
-labels_by = "nessuna label guard per riga: messages, prompt_source, response_policy"
+texts_by = "prompt da Aegis 2.0, gretel-safety-alignment-en-v1, notadib/harmful-tasks (mit) e sottoinsiemi sintetici sdg_*; risposte rigenerate (metadata.sdg_model: nemotron-nano-v2-9b 61.930 righe, gpt-oss-120b e gpt-oss-120b-medium 68.420); prompt e risposte non inglesi tradotti con nvidia/Riva-Translate-4B-Instruct-v1.1 (metadata.translation_model su tutte le 86.829 righe tradotte, 14.459 en_it; conteggi sull'intero data/train.jsonl alla revisione)"
+labels_by = "nessuna label guard per riga: messages, prompt_source, response_policy; metadata.prompt_label su 122.245 righe, fonte non dichiarata"
 generators = [
-  "modelli delle risposte e dei prompt sdg_*: NON VERIFICATI (il README non li nomina)",
-  "nvidia/Riva-Translate-4B-Instruct-v1.1 (nvidia-community-model-license): traduzione; termini sugli output NON VERIFICATI",
+  "nvidia/Riva-Translate-4B-Instruct-v1.1 (NVIDIA Community Model License): traduzione di tutte le righe non inglesi (testo)",
+  "nvidia/NVIDIA-Nemotron-Nano-9B-v2 (nvidia-open-model-license; metadata.sdg_model nemotron-nano-v2-9b): risposte (testo)",
+  "openai/gpt-oss-120b (apache-2.0; metadata.sdg_model gpt-oss-120b e gpt-oss-120b-medium): risposte (testo)",
+  "generatore dei prompt sdg_*: NON VERIFICATO (README e metadati non lo nominano; sdg_model compare anche sulle righe con prompt di Aegis, quindi indica il modello delle risposte)",
+  "modello di moderazione che scarta le risposte unsafe (README): non nominato, solo filtro",
 ]
-generator_terms = "INCERTO"
-generator_terms_note = "I modelli che hanno generato risposte e prompt sintetici non sono dichiarati; i termini della licenza community NVIDIA sugli output del traduttore non sono verificati."
+generator_terms = "NO"
+generator_terms_note = "La NVIDIA Community Model License di Riva-Translate (v. 15/04/2025, https://www.nvidia.com/en-us/agreements/enterprise-software/nvidia-community-models-license/) dice: «You may not: ... Use the NVIDIA Models, Derivative Models or any output or results of them to develop or improve any other AI models (excluding NVIDIA Models or Derivative Models), unless approved by NVIDIA in writing (email approval being sufficient)». Tutte le righe italiane sono output di Riva (metadata.translation_model): con lingue it+en la voce è NO per l'ADR 0002. NVIDIA ha pubblicato le stesse traduzioni in CC BY 4.0, «ready for commercial or non-commercial uses»: la licenza non dice se valga come approvazione scritta, che si può chiedere a NVIDIA per email. Una voce solo inglese resterebbe INCERTO: Nano-9B-v2 (NVIDIA Open Model License, v. 24/10/2025: «NVIDIA claims no ownership rights in outputs», nessun limite sull'uso degli output) e gpt-oss-120b (apache-2.0) sono compatibili, ma il generatore dei prompt sdg_* non è dichiarato."
 filters = ["label da ricostruire con la giuria di teacher", "deduplica contro tutti i benchmark del manifest"]
 title = "Nemotron-SFT-Safety-v2"
 authors = "NVIDIA Corporation"
 url = "https://huggingface.co/datasets/nvidia/Nemotron-SFT-Safety-v2"
 changes = "nessun convertitore ancora"
-risks = ["dati SFT di allineamento, non di classificazione", "italiano tradotto a macchina", "prompt condivisi con Aegis 2.0 e Gretel"]
+risks = ["dati SFT di allineamento, non di classificazione", "italiano tradotto da Riva-Translate: output vietati per addestrare altri modelli senza approvazione scritta di NVIDIA", "prompt condivisi con Aegis 2.0 e Gretel"]
 
 [[dataset]]
 name = "aya-redteaming-en"
@@ -303,17 +309,17 @@ surfaces = ["injection_direct"]
 license = "apache-2.0"
 license_source = "API cardData.license; il README dichiara anche license: cc-by-4.0 dentro dataset_info"
 gated = false
-texts_by = "NON VERIFICATO (README senza descrizione)"
-labels_by = "label 0/1, autore NON VERIFICATO"
-generators = ["NON VERIFICATO"]
+texts_by = "deepset (blog del 19/05/2023, https://haystack.deepset.ai/blog/how-to-prevent-prompt-injections): «we first assembled a novel dataset of 662 widely varying prompts, including 263 prompt injections and 399 legitimate requests» e «we included translations of both prompt injections as well as legitimate requests»; fonte dei prompt e strumento di traduzione non dichiarati (README: «More Information needed»)"
+labels_by = "deepset per costruzione: injection o richiesta legittima, più prompt «stacked» composti a caso (blog)"
+generators = ["fonte dei 662 prompt: NON DICHIARATA («assembled»)", "traduttore delle righe non inglesi: NON DICHIARATO"]
 generator_terms = "INCERTO"
-generator_terms_note = "Provenienza di testi e label non dichiarata."
+generator_terms_note = "L'unica fonte primaria oltre al README vuoto è il blog di deepset, che non dice chi ha scritto o raccolto i prompt né con quale strumento sono state fatte le traduzioni. Mancano entrambe le informazioni: serve una risposta di deepset o una decisione umana."
 filters = ["deduplica contro tutti i benchmark del manifest"]
 title = "prompt-injections"
 authors = "deepset"
 url = "https://huggingface.co/datasets/deepset/prompt-injections"
 changes = "nessun convertitore ancora"
-risks = ["provenienza ignota", "lingua non dichiarata nei metadati"]
+risks = ["provenienza ignota", "lingua non dichiarata nei metadati, ma il blog dichiara traduzioni (traduttore ignoto)"]
 
 [[dataset]]
 name = "llmail-inject"
@@ -396,9 +402,12 @@ license_source = "API cardData.license e README («distributed under the MIT Lic
 gated = false
 texts_by = "giocatori umani di Gandalf (luglio 2023)"
 labels_by = "selezione per similarità (>= 0,825) con embeddings OpenAI text-embedding-ada-002; PII filtrate con Lakera Guard"
-generators = ["OpenAI text-embedding-ada-002: selezione delle righe (termini OpenAI)"]
+generators = [
+  "OpenAI text-embedding-ada-002: similarità con «Ignore all previous instructions» >= 0,825 per scegliere le righe; l'embedding non entra nei testi, ma la selezione è l'unica base della label positiva",
+  "Lakera Guard (Lakera, autore del dataset): filtro PII, scarta righe",
+]
 generator_terms = "INCERTO"
-generator_terms_note = "La selezione dipende da output di un modello OpenAI, i cui termini vietano l'uso degli output per sviluppare modelli concorrenti; applicabilità a una selezione NON VERIFICATA."
+generator_terms_note = "Testi umani, nessun output di modello nel testo. Il Services Agreement OpenAI corrente (efficace dal 01/01/2026, https://openai.com/policies/business-terms/) vieta «except for a Permitted Exception, use Output to develop artificial intelligence models that compete with OpenAI’s products and services»; la Permitted Exception per i classificatori vale solo «if these models are not distributed or made commercially available to third parties», quindi non per un modello pubblicato. Il vincolo è su Lakera, cliente nel luglio 2023; i termini OpenAI del 2023 non sono stati letti (le pagine consumer rispondono 403). Non stabilito: se scegliere righe per similarità di embedding sia «use Output to develop» il modello di chi riceve il dataset MIT. Serve una decisione umana."
 filters = ["deduplica contro tutti i benchmark del manifest"]
 title = "gandalf_ignore_instructions"
 authors = "Lakera; Pfister, N., Volhejn, V., Knott, M., Arias, S., et al., «Gandalf the Red: Adaptive Security for LLMs», arXiv:2501.07927"
@@ -482,11 +491,11 @@ surfaces = ["injection_direct"]
 license = "apache-2.0"
 license_source = "API cardData.license, README e file NOTICE (Apache 2.0, contenuti del dataset inclusi)"
 gated = false
-texts_by = "NON VERIFICATO (source_datasets: original; autore e traduttore non dichiarati)"
+texts_by = "NON DICHIARATO: README senza metodo (source_datasets: original); NOTICE «Copyright 2023 Yanis Miraoui ... This NOTICE applies to the dataset contents (including prompt_injections.csv)»; nessun repository di generazione tra quelli pubblici di yanismiraoui su GitHub (letti il 2026-10-15)"
 labels_by = "nessuna label: una sola colonna di injection"
-generators = ["NON VERIFICATO"]
+generators = ["NON DICHIARATO se i prompt in sette lingue siano scritti a mano, tradotti a macchina o generati"]
 generator_terms = "INCERTO"
-generator_terms_note = "Il README non dice chi ha scritto o tradotto i prompt in sette lingue."
+generator_terms_note = "L'autore dichiara Apache-2.0 sui contenuti (NOTICE), ma README e NOTICE non dicono chi ha scritto i prompt né come sono state ottenute le versioni in sette lingue. Manca la provenienza: serve una risposta dell'autore o una decisione umana."
 filters = ["solo righe it/en", "deduplica contro tutti i benchmark del manifest"]
 title = "Prompt Injections"
 authors = "Yanis Miraoui"
@@ -532,14 +541,15 @@ surfaces = ["injection_indirect"]
 license = "cc-by-4.0"
 license_source = "API cardData.license e README (License/Terms of Use)"
 gated = false
-texts_by = "interamente sintetico: task, ambienti e injection generati da LLM"
-labels_by = "verifier deterministico dell'ambiente RL"
+texts_by = "interamente sintetico: obiettivi, task, ambienti e injection generati da Nemotron Super 3, che fa anche da attaccante (README, «LLM generator used (also serves as the red-teaming attacker)»)"
+labels_by = "verifier deterministico a tracce («No LLM judge is used»); restano solo le injection che hanno ingannato il difensore Nemotron Nano 3"
 generators = [
-  "nvidia/NVIDIA-Nemotron-3-Super-120B-A12B-BF16 (nvidia-nemotron-open-model-license): generatore e attaccante",
-  "nvidia/NVIDIA-Nemotron-3-Nano-30B-A3B-BF16: difensore",
+  "nvidia/NVIDIA-Nemotron-3-Super-120B-A12B-BF16 (nvidia-nemotron-open-model-license): obiettivi, task, ambienti e testo delle injection; attaccante (testo)",
+  "nvidia/NVIDIA-Nemotron-3-Nano-30B-A3B-BF16 (nvidia-nemotron-open-model-license): difensore; la riga resta solo se il difensore segue l'injection (la selezione è la label positiva)",
+  "LLM che valuta gli obiettivi dell'attaccante («LLM grading of attacker goals»): non nominato, solo filtro",
 ]
-generator_terms = "INCERTO"
-generator_terms_note = "I termini della NVIDIA Nemotron Open Model License sugli output usati per addestrare altri modelli non sono stati letti."
+generator_terms = "SÌ"
+generator_terms_note = "NVIDIA Nemotron Open Model License (v. 15/12/2025, https://www.nvidia.com/en-us/agreements/enterprise-software/nvidia-nemotron-open-model-license/): «Works are commercially usable. You are free to create and distribute Derivative Works. NVIDIA does not claim ownership to any outputs generated using the Works or Derivative Works.»; nessuna clausola limita l'uso degli output per addestrare altri modelli o impone un nome. Unico modello non nominato: il giudice degli obiettivi, che scarta righe e non scrive testi né label."
 filters = ["formato RL: estrarre il campo che contiene l'injection", "deduplica contro tutti i benchmark del manifest"]
 title = "Nemotron-RL-Agentic-Indirect-Prompt-Injection-v1"
 authors = "NVIDIA Corporation"
@@ -563,10 +573,10 @@ license = "cc0-1.0"
 license_source = "API cardData.license e README («Original generated records are marked CC0-1.0»; codice MIT, file LICENSE-DATA e LICENSE-CODE-MIT); la dedica non copre testi upstream"
 gated = false
 texts_by = "progetto Open-Jev: task «controlled, mostly synthetic» (customer support, workflow locali, geometria, Snake, tic-tac-toe, ViZDoom, ragionamento controllato); descrizioni delle domande customer-control dalla documentazione TypeSafe"
-labels_by = "target di riferimento della fonte (regole, oracoli programmatici, script expert); metadata_json può contenere label teacher privilegiate (mai lette); modello teacher NON VERIFICATO"
-generators = ["teacher o generatore LLM: NON VERIFICATO (il README non lo nomina)"]
-generator_terms = "INCERTO"
-generator_terms_note = "Il README dichiara record «mostly synthetic» e label teacher privilegiate nei metadati, ma non nomina il modello teacher: i suoi termini d'uso non sono verificabili. Serve una decisione umana."
+labels_by = "target calcolati da codice: regole, oracoli programmatici e «teacher» scritti in Python (case_browser.py: «No browser, external dataset or model is invoked»; control-games-v1: «deterministic current-observation teacher»; workflow-controls-v1: «Local deterministic synthetic policy labels»); metadata_json mai letto"
+generators = ["nessun LLM: generatori procedurali seminati di Open-Jev (reproduce/source-code/jev alla revisione); il «teacher» del README è uno script, non un modello"]
+generator_terms = "SÌ"
+generator_terms_note = "Letti alla revisione fissata provenance/original-manifests/release-v2.json (fonti customer-control, painting-geometry, reasoning-control, snake, tic_tac_toe, tile_platformer, trex_runner, vizdoom-basic, wikispeedia, workflow-controls) e il codice dei generatori: nessuna chiamata a modelli nella generazione (case_citation.py: «CPU-only generation, no model calls»; painting.py: «does not load a model or call a hosted service»; case_reasoning.py: «Labels are exact controls»). Wikispeedia è escluso dalla config redistributable, customer-control dal filtro della voce. LICENSE-DATA: «Original generated Open-Jev records are dedicated under CC0 1.0 Universal»."
 filters = [
   "solo domande noul con opzioni [no, yes] e target netto: yes = VIOLATION, no = NO_VIOLATION",
   "choice, score, target non netti e opzioni inattese esclusi con il motivo",
@@ -579,7 +589,7 @@ authors = "ZefanCai (Hugging Face), progetto Open-Jev (github.com/Zefan-Cai/Open
 url = "https://huggingface.co/datasets/ZefanCai/Open-Jev"
 changes = "domanda come criterio e stato decodificato come evidenza (superficie prompt); selezione delle domande sì/no con target netto; deduplica contro i benchmark"
 risks = [
-  "teacher non dichiarato: bloccato dal cancello fino a una decisione umana",
+  "vizdoom-basic: stati da traiettorie ViZDoom reali con script esperto; asset e scenari upstream restano con le loro licenze (THIRD_PARTY_NOTICES.md) e non entrano nel testo",
   "domini non testuali in senso stretto (pixel, giochi): il peso nel mix lo decide il costruttore del mix",
   "test e OOD hanno label pubbliche: registrati come benchmark open-jev-heldout, mai training",
 ]
@@ -763,17 +773,20 @@ surfaces = ["prompt", "response"]
 license = "odc-by"
 license_source = "API cardData.license; README e AI2 Responsible Use Guidelines non leggibili senza accesso (README 403, first-rows 401)"
 gated = true
-texts_by = "NON VERIFICATO (gated)"
-labels_by = "NON VERIFICATO (gated)"
-generators = ["NON VERIFICATO (gated)"]
+texts_by = "coppie prompt-risposta dei dati sintetici vanilla e adversarial di WildGuardMix (paper arXiv:2406.18495v3, §3.1-3.2); README non leggibile (gated)"
+labels_by = "tre annotatori umani per coppia, voto di maggioranza; audit con un classificatore GPT-4 sulle discordanze (paper §3.2)"
+generators = ["GPT-4 e LLM aperti: prompt e risposte sintetiche (paper §3.1)", "GPT-4: audit delle label (paper §3.2)"]
 generator_terms = "INCERTO"
-generator_terms_note = "Schema e generatori non leggibili senza accettare il gating AI2."
+generator_terms_note = "Testi in parte GPT-4 (termini OpenAI); irrilevante per la sola valutazione. Il 2026-10-15 l'account Naicud non ha accesso: README 403 («you are not in the authorized list»), first-rows non accessibile; schema e campi di testo non verificabili."
 filters = ["file test/wildguard_test.parquet (config pubblica nei metadati API)"]
 title = "WildGuardTest (allenai/wildguardmix)"
 authors = "Allen Institute for AI; autori NON VERIFICATI (README non leggibile)"
 url = "https://huggingface.co/datasets/allenai/wildguardmix"
 changes = "solo valutazione"
-risks = ["gated: serve accettare le AI2 Responsible Use Guidelines con l'account del perimetro"]
+risks = [
+  "gated: con l'account Naicud aprire https://huggingface.co/datasets/allenai/wildguardmix, compilare nome, organizzazione, paese, email e uso previsto, spuntare le quattro caselle; l'accesso è automatico",
+  "una casella chiede «I agree to use this dataset for research purposes in accordance with the AI2 Responsible Use Guidelines»: la compatibilità con la valutazione di un modello pubblicato la decide la persona",
+]
 # text_fields assente: schema NON VERIFICATO, il cancello blocca la build.
 
 [[dataset]]
@@ -896,8 +909,8 @@ gated = false
 texts_by = "come open-jev-train"
 labels_by = "come open-jev-train; label pubbliche («future work must disclose any use of them», README)"
 generators = ["come open-jev-train"]
-generator_terms = "INCERTO"
-generator_terms_note = "Teacher non dichiarato; irrilevante per la sola valutazione."
+generator_terms = "SÌ"
+generator_terms_note = "Come open-jev-train: generatori procedurali, nessun LLM."
 filters = ["indicizzati state_json e le evidenze dei casi di scudo.open_jev"]
 title = "Open-Jev: typed decision datasets (release-v2-redistributable), split test e ood"
 authors = "ZefanCai (Hugging Face), progetto Open-Jev (github.com/Zefan-Cai/Open-Jev-Dev)"
