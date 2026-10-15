@@ -66,15 +66,32 @@ def test_primary_averages_benchmarks_per_language_then_the_two_languages():
         "mixed": bench("mixed", [(V, N)]),  # fuori dalla regola IT/EN
     }
     out = primary(runs)
-    assert out == {"it": 1.0, "en": 0.5, "score": 0.75, "gap": 0.5}
+    assert out == {"it": 1.0, "en": 0.5, "score": 0.75, "gap": None}  # nessun bilingue
     with pytest.raises(ValueError, match="it"):
         primary({"en": bench("en", [(V, V)])})
+
+
+def test_gap_uses_only_benchmarks_with_both_languages():
+    runs = {
+        "bilingual": bench("it", [(V, V), (N, N)], "bi-it") + bench("en", [(V, N), (N, N)], "bi-en"),
+        "en-only": bench("en", [(V, V), (N, N)]),  # piu' facile, solo inglese
+    }
+    out = primary(runs)
+    assert out["it"] == 1.0 and out["en"] == pytest.approx((1 / 3 + 1.0) / 2)
+    assert out["gap"] == pytest.approx(1.0 - 1 / 3)  # solo il benchmark bilingue
+
+
+def test_a_candidate_without_bilingual_benchmarks_is_excluded():
+    runs = {"it-bench": bench("it", [(V, V), (N, N)], "it"),
+            "en-bench": bench("en", [(V, V), (N, N)], "en")}
+    out = compare(runs, runs, resamples=20, seed=1)
+    assert out["candidate"]["gap"] is None and "divario IT-EN non misurato" in out["verdict"]
 
 
 def control_runs(n=200):
     pairs = [(V, V), (N, N), (V, N), (N, N)] * (n // 4)
     refusals = [(N, N)] * 40 + [(N, V)] * 10
-    return {"it-bench": bench("it", pairs, "it"), "en-bench": bench("en", pairs, "en"),
+    return {"bench": bench("it", pairs, "it") + bench("en", pairs, "en"),
             "xstest-it": bench("it", refusals, "xsit", "over_refusal"),
             "xstest": bench("en", refusals, "xs", "over_refusal")}
 
@@ -90,7 +107,7 @@ def test_comparison_also_reports_binary_detection_overall_and_per_benchmark():
     out = compare(control_runs(), control_runs(), resamples=20, seed=1)
     for side in ("control", "candidate"):
         binary = out[side]["binary"]
-        assert binary["recall"] == pytest.approx(0.5)  # it/en-bench: metà dei V letti come N
+        assert binary["recall"] == pytest.approx(0.5)  # bench: metà dei V letti come N
         assert binary["false_positive_rate"] == pytest.approx(20 / 300)  # i V su gold NV: xstest
         assert set(out[side]["binary_by_benchmark"]) == set(control_runs())
         assert out[side]["binary_by_benchmark"]["xstest"]["recall"] is None
@@ -98,8 +115,7 @@ def test_comparison_also_reports_binary_detection_overall_and_per_benchmark():
 
 def test_clear_gain_with_ci_above_zero_replaces_the_control_pending_a_second_seed():
     better = control_runs()
-    for name in ("it-bench", "en-bench"):
-        better[name] = [res(r.case_id, r.language, r.gold, r.gold) for r in better[name]]
+    better["bench"] = [res(r.case_id, r.language, r.gold, r.gold) for r in better["bench"]]
     out = compare(control_runs(), better, resamples=300, seed=1)
     assert out["delta"]["primary"] >= MIN_GAIN and out["ci95"][0] > 0
     assert out["verdict"].startswith("SOSTITUISCE IL CONTROLLO")
@@ -115,7 +131,7 @@ def test_secondary_constraints_and_readout_errors_exclude_the_candidate():
     assert out["verdict"].startswith("ESCLUSO") and "over-refusal" in out["verdict"]
 
     broken = control_runs()
-    broken["en-bench"][0] = res("en:0", "en", V, None)
+    broken["bench"][200] = res("en:0", "en", V, None)
     out = compare(control_runs(), broken, resamples=50, seed=1)
     assert out["candidate"]["errors"] == 1 and "errori di readout" in out["verdict"]
 
@@ -125,7 +141,8 @@ def test_secondary_constraints_and_readout_errors_exclude_the_candidate():
     assert out["delta"]["ece"] > ECE_MAX_DELTA and "ECE" in out["verdict"]
 
     skewed = control_runs()
-    skewed["it-bench"] = [res(r.case_id, r.language, r.gold, N) for r in skewed["it-bench"]]
+    skewed["bench"] = [res(r.case_id, r.language, r.gold, N) if r.language == "it" else r
+                       for r in skewed["bench"]]
     out = compare(control_runs(), skewed, resamples=50, seed=1)
     assert abs(out["candidate"]["gap"]) > GAP_MAX and "divario IT-EN" in out["verdict"]
 

@@ -377,6 +377,16 @@ Ogni modello scrive anche `results.json` (benchmark -> una riga per caso: id,
 lingua, superficie, gold, verdetto, probabilità, errore), l'ingresso del
 confronto del bake-off.
 
+## Scoreboard
+
+Dopo ogni run, `python -m scudo.scoreboard <eval/<scudo_sha>> --on <data>` legge
+i report per benchmark scaricati da HF e aggiorna `docs/scoreboard.json` (una
+voce per SHA e modello: identità del run, pesi con revisione e hash, stato della
+deduplica, metriche per benchmark e per lingua) e
+[`scoreboard.md`](scoreboard.md), generato dal JSON. Entrano solo aggregati,
+mai `results.json` né testi dei casi; un run ripetuto allo stesso SHA sostituisce
+la voce precedente. È la traccia del progresso da un run all'altro.
+
 ## Bake-off del Fast
 
 Protocollo e regola in
@@ -416,7 +426,8 @@ Protocollo e regola in
     gold mai predetta) la regola conta 0;
   - over-refusal (casi `over_refusal` con gold NO_VIOLATION giudicati VIOLATION,
     su tutti i benchmark) e ECE: differenza con il controllo;
-  - divario IT–EN della metrica primaria del candidato;
+  - divario IT–EN della macro-F1 del candidato sui soli benchmark con casi in
+    entrambe le lingue (senza benchmark bilingui: non misurato, candidato escluso);
   - intervallo bootstrap appaiato al 95% della differenza di metrica primaria:
     1.000 ricampionamenti, `random.Random(3407)`, stratificati per benchmark e
     lingua, gli stessi casi per i due modelli, percentili 2,5 e 97,5.

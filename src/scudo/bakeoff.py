@@ -94,18 +94,34 @@ def _combine(by_language: Mapping[str, list[float]]) -> dict:
         if not by_language[lang]:
             raise ValueError(f"nessun benchmark con casi {lang} valutabili")
         means[lang] = sum(by_language[lang]) / len(by_language[lang])
-    return {**means, "score": (means["it"] + means["en"]) / 2, "gap": means["it"] - means["en"]}
+    return {**means, "score": (means["it"] + means["en"]) / 2}
 
 
 def primary(runs: Runs) -> dict:
-    """Macro-F1 per benchmark e lingua, media per lingua, poi media di IT ed EN."""
+    """Macro-F1 per benchmark e lingua, media per lingua, poi media di IT ed EN.
+
+    Il divario IT-EN si misura solo sui benchmark con casi in entrambe le lingue:
+    le medie per lingua coprono insiemi di benchmark diversi (l'inglese ha i
+    benchmark solo inglesi), e la loro differenza misurerebbe i benchmark, non la
+    lingua. Senza benchmark bilingui il divario e' None (non misurato).
+    """
     by_language = {lang: [] for lang in LANGUAGES}
+    paired = {lang: [] for lang in LANGUAGES}
     for results in runs.values():
-        for lang in LANGUAGES:
-            score = macro_f1([item for item in results if item.language == lang])
+        scores = {lang: macro_f1([item for item in results if item.language == lang])
+                  for lang in LANGUAGES}
+        for lang, score in scores.items():
             if score is not None:
                 by_language[lang].append(score)
-    return _combine(by_language)
+        if all(score is not None for score in scores.values()):
+            for lang, score in scores.items():
+                paired[lang].append(score)
+    out = _combine(by_language)
+    gap = None
+    if paired["it"]:
+        means = {lang: sum(paired[lang]) / len(paired[lang]) for lang in LANGUAGES}
+        gap = means["it"] - means["en"]
+    return {**out, "gap": gap}
 
 
 def _side(runs: Runs) -> dict:
@@ -177,7 +193,9 @@ def compare(control: Runs, candidate: Runs, *, resamples: int = RESAMPLES,
             problems.append(f"{label} non misurato")
         elif delta[key] > limit:
             problems.append(f"{label} {delta[key]:+.3f} oltre +{limit}")
-    if abs(cand["gap"]) > GAP_MAX:
+    if cand["gap"] is None:
+        problems.append("divario IT-EN non misurato: nessun benchmark bilingue")
+    elif abs(cand["gap"]) > GAP_MAX:
         problems.append(f"divario IT-EN {cand['gap']:+.3f} oltre {GAP_MAX}")
     if problems:
         verdict = "ESCLUSO: " + "; ".join(problems)
