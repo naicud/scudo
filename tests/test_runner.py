@@ -349,3 +349,17 @@ def verify_weights():
     from scudo.artifacts import ArtifactIdentity
 
     return [ArtifactIdentity("org/model", SHA, "model.safetensors", "0" * 64)]
+
+
+def test_a_benchmark_the_model_cannot_score_at_all_gets_no_report_instead_of_stopping_the_run():
+    from scudo.eval_report import EvalResult
+
+    cases = (case(source_id="a"), case(source_id="b", verdict="NO_VIOLATION"))
+    loaded = loaded_of(*cases, machine=(1,))
+    results = [EvalResult(f"bench:{c.source_id}", c.language, c.surface, c.verdict, None,
+                          error="UNSUPPORTED") for c in cases]
+    reports = reports_for(loaded, results, dedup={"status": "NOT_RUN"}, proof_type="reference",
+                          model="granite-4.1-3b-policy-guardrails", weights=verify_weights(),
+                          scudo_sha=SHA, runtime={"name": "transformers", "version": "5.17.0"},
+                          harness="test", format="policy")
+    assert reports == {}

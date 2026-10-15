@@ -22,7 +22,7 @@ from scudo.artifacts import ArtifactError, ArtifactIdentity, load_verified
 from scudo.baselines import BASELINES, BaselineError, LabelReadout, build_input, parse
 from scudo.benchmarks import Loaded
 from scudo.cases import Case
-from scudo.eval_report import EvalResult, build_report
+from scudo.eval_report import UNSUPPORTED, EvalResult, build_report
 from scudo.protocol import OPTION_LETTERS, Readout, read_options, training_row
 
 # File alla radice di un repository di pesi: config, tokenizer, template, pesi, codice.
@@ -293,11 +293,15 @@ def reports_for(loaded: Loaded, results: Sequence[EvalResult], *, dedup: dict,
                 **header) -> dict[str, dict]:
     """Report del benchmark e, se ci sono label non umane, quello sulle sole label umane.
 
-    Ogni report cita conteggi del benchmark e verifica della deduplica.
+    Ogni report cita conteggi del benchmark e verifica della deduplica. Un benchmark
+    che il modello non copre affatto (tutti i casi `UNSUPPORTED`) non ha report: il
+    chiamante lo registra fra i non supportati invece di fermare il run.
     """
+    if all(item.error == UNSUPPORTED for item in results):
+        return {}
     out = {loaded.name: build_report(results, split=loaded.name, **header)}
     human = [item for item in results if item.case_id not in loaded.machine_labelled]
-    if loaded.machine_labelled and human:
+    if loaded.machine_labelled and any(item.error != UNSUPPORTED for item in human):
         name = f"{loaded.name}/human-labels"
         out[name] = build_report(human, split=name, **header)
     for report in out.values():

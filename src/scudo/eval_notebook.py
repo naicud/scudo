@@ -178,6 +178,10 @@ def evaluate(model, score, **header):
         reports = reports_for(loaded, results, dedup=DEDUP, model=model,
                               scudo_sha=RUN_LOG["scudo_sha"], harness="scudo.eval_notebook",
                               **header)
+        if not reports:  # nessun caso del benchmark e' coperto dal modello
+            out[name] = {"cases": 0, "unsupported": len(results)}
+            print(model, name, "NON SUPPORTATO:", len(results), "casi")
+            continue
         for split, report in reports.items():
             path = REPORT_DIR / model / (split.replace("/", "__") + ".json")
             path.parent.mkdir(parents=True, exist_ok=True)

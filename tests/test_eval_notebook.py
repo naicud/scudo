@@ -133,3 +133,8 @@ def test_bakeoff_adapters_are_the_uploads_of_the_real_runs():
         "gemma4-e4b": "fa039d8cedcb3e0784adf64fa5a422a975b96428",
         "ministral3-3b": "d2c8d3bbadd87f50cfe9bd9b469481baf23a861e",
     }
+
+
+def test_a_benchmark_the_model_does_not_cover_is_recorded_not_fatal():
+    source = "\n".join(code_cells(build()))
+    assert 'out[name] = {"cases": 0, "unsupported": len(results)}' in source
