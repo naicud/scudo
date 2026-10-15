@@ -75,6 +75,15 @@ def cases_from_row(row: dict) -> tuple[list[Case], Counter]:
     return cases, dropped
 
 
+# Ingestione (`scudo.ingest`): casi e scarti per motivo di una riga.
+convert_row = cases_from_row
+
+
+def needs_relabel(row: dict, case: Case) -> bool:
+    """Label dalla costruzione del dataset (turni e distrattori), non da una giuria."""
+    return False
+
+
 def convert(rows: Iterable[dict]) -> tuple[list[Case], Counter]:
     cases, dropped = [], Counter()
     for row in rows:

@@ -66,24 +66,32 @@ read_on = "2026-10-15"
 config = "default"
 splits = ["train"]
 languages = ["en"]
-surfaces = ["prompt", "response"]
+surfaces = ["prompt"]
 license = "cc-by-4.0"
 license_source = "API cardData.license e README («License: CC-BY-4.0»)"
 gated = false
-texts_by = "prompt umani da Anthropic/hh-rlhf (mit); risposte di mistralai/Mistral-7B-v0.1; colonne text e text_type (user_message, llm_response, combined)"
-labels_by = "umani: 12 annotatori e 2 persone di quality assurance NVIDIA (labels_0..labels_4)"
-generators = ["mistralai/Mistral-7B-v0.1 (apache-2.0): risposte"]
+texts_by = "prompt umani da Anthropic/hh-rlhf (mit); risposte di mistralai/Mistral-7B-v0.1; colonne text e text_type (user_message, llm_response, combined, multi_turn)"
+labels_by = "umani: 12 annotatori e 2 persone di quality assurance NVIDIA; da 3 a 5 annotazioni per riga (labels_0..labels_4, num_annotations), ognuna Safe, Needs Caution o una o più categorie di rischio separate da virgola"
+generators = ["mistralai/Mistral-7B-v0.1 (apache-2.0): risposte, escluse dal filtro"]
 generator_terms = "SÌ"
-generator_terms_note = "Testi umani e Mistral-7B-v0.1 (apache-2.0), label umane."
+generator_terms_note = "Entrano solo prompt umani (HH-RLHF, MIT) con label umane."
 filters = [
-  "label a livello di dialogo: valide per il prompt solo se il dialogo è un solo prompt (README)",
-  "deduplica contro Aegis 2.0 e contro tutti i benchmark del manifest",
+  "solo text_type = user_message: le label sono per dialogo e valgono per il prompt solo se il dialogo è un solo messaggio (README); llm_response, combined e multi_turn concatenano prompt e risposta senza separatore",
+  "verdetto solo con annotatori unanimi: tutti Safe = NO_VIOLATION; tutti categorie di rischio (le 13 del README, Other compresa) = VIOLATION",
+  "escluse le righe con Needs Caution, disaccordo, annotazioni non nulle diverse da num_annotations, label fuori tassonomia (es. Fraud/Deception, Graphic) o testo vuoto",
+  "spazi esterni del testo rimossi",
+  "deduplica contro tutti i benchmark del manifest; la deduplica contro Aegis 2.0 spetta al costruttore del mix",
 ]
 title = "Nemotron Content Safety Dataset V1 (Aegis AI Content Safety Dataset 1.0)"
 authors = "NVIDIA; Ghosh, S., Varshney, P., Galinkin, E., Parisien, C., «AEGIS: Online Adaptive AI Content Safety Moderation with Ensemble of LLM Experts»"
 url = "https://huggingface.co/datasets/nvidia/Aegis-AI-Content-Safety-Dataset-1.0"
-changes = "nessun convertitore ancora: mappatura delle categorie su VIOLATION/NO_VIOLATION da definire"
-risks = ["contenuti dannosi", "sovrapposto ad Aegis 2.0 (stessa origine HH-RLHF)", "label Needs Caution senza corrispondenza binaria"]
+changes = "selezione dello split train e delle righe user_message; voto unanime degli annotatori mappato su VIOLATION/NO_VIOLATION con il criterio di Aegis 2.0 sul prompt; spazi esterni rimossi; deduplica contro i benchmark"
+risks = [
+  "contenuti dannosi",
+  "sovrapposto ad Aegis 2.0 (stessa origine HH-RLHF)",
+  "righe ripetute con lo stesso id (93 tra le user_message del train)",
+  "prompt estratti da dialoghi multi-turno: alcuni dipendono dal contesto mancante",
+]
 
 [[dataset]]
 name = "nemotron3-train"
@@ -164,22 +172,22 @@ role = "train"
 revision = "5a16fee03c19d681b4f3527b6a750e1ed4d434c7"
 read_on = "2026-10-15"
 config = "default"
-splits = ["train"]
+splits = ["english"]
 languages = ["en"]
 surfaces = ["prompt"]
 license = "apache-2.0"
 license_source = "API cardData.license e README («can be used for any purpose, whether academic or commercial»)"
 gated = false
-texts_by = "annotatori professionisti retribuiti (README); file aya_eng.jsonl"
-labels_by = "umani: harm_category, global_or_local"
+texts_by = "annotatori professionisti retribuiti (README); split english = file aya_eng.jsonl"
+labels_by = "umani: harm_category (lista JSON delle 9 categorie del README), global_or_local"
 generators = ["nessun modello dichiarato"]
 generator_terms = "SÌ"
 generator_terms_note = "Testi e label umani."
-filters = ["solo aya_eng.jsonl (nessun file italiano)", "solo prompt dannosi: servono negativi da altre fonti", "deduplica contro tutti i benchmark del manifest"]
+filters = ["solo split english (aya_eng.jsonl; nessun file italiano)", "righe con language diversa da English, testo vuoto o harm_category vuota escluse", "solo prompt dannosi: i negativi vengono da altre fonti", "deduplica contro tutti i benchmark del manifest"]
 title = "Aya Red-teaming"
 authors = "Aakanksha, Ahmadian, A., Ermis, B., Goldfarb-Tarrant, S., Kreutzer, J., Fadaee, M., Hooker, S., «The Multilingual Alignment Prism: Aligning Global and Local Preferences to Reduce Harm»"
 url = "https://huggingface.co/datasets/CohereLabs/aya_redteaming"
-changes = "nessun convertitore ancora"
+changes = "selezione dello split english; ogni prompt di red-teaming (dannoso per costruzione, README) diventa VIOLATION con il criterio di Aegis 2.0 sul prompt; harm_category non entra nel criterio; deduplica contro i benchmark"
 risks = ["solo positivi", "rinominato da CohereForAI/aya_redteaming (stesso commit)"]
 
 [[dataset]]
@@ -196,21 +204,28 @@ license = "apache-2.0"
 license_source = "README («released under the Apache 2.0 License»); API cardData.license assente"
 gated = false
 texts_by = "Gretel Navigator con ibm-granite/granite-3.0-8b(-instruct), Qwen/Qwen2.5-7B(-Instruct), mistralai/Mistral-Nemo-Instruct-2407"
-labels_by = "punteggi del giudice (judge_response_score) e probabilità di danno di ibm-granite/granite-guardian-3.0-2b"
+labels_by = "per costruzione (README): prompt con richiesta non sicura, response iniziale, safe_response revisionata; punteggi judge_* di un LLM-as-a-judge non nominato; probabilità di danno di ibm-granite/granite-guardian-3.0-2b"
 generators = [
   "ibm-granite/granite-3.0-8b-instruct e -base (apache-2.0)",
   "Qwen/Qwen2.5-7B e -Instruct (apache-2.0)",
   "mistralai/Mistral-Nemo-Instruct-2407 (apache-2.0)",
-  "ibm-granite/granite-guardian-3.0-2b (apache-2.0): probabilità di danno",
+  "ibm-granite/granite-guardian-3.0-2b (apache-2.0): probabilità di danno, usata come label delle risposte",
+  "LLM-as-a-judge dei punteggi judge_*: modello NON VERIFICATO (il README lo descrive solo come «LLM-as-a-judge»); punteggi non usati",
 ]
 generator_terms = "SÌ"
-generator_terms_note = "Tutti i generatori dichiarati sono apache-2.0 (licenze lette dall'API dei modelli)."
-filters = ["label binarie da derivare dai punteggi: soglia da fissare nel convertitore", "deduplica contro tutti i benchmark del manifest"]
+generator_terms_note = "Testi da modelli apache-2.0 dichiarati («small language models like ...», README); label delle risposte da Granite Guardian (apache-2.0). I punteggi del giudice non nominato non entrano; se il giudice abbia anche selezionato le righe non è dichiarato (i punteggi osservati sono 1-3 per response e 2-5 per safe_response)."
+filters = [
+  "split train delle cinque config di rischio (config default)",
+  "prompt = VIOLATION con il criterio di Aegis 2.0 per le richieste (README: richiesta non sicura esplicita o sottile)",
+  "response = VIOLATION e safe_response = NO_VIOLATION con il criterio per le risposte solo se Granite Guardian concorda (probabilità > 0,5 o < 0,5); altrimenti la risposta resta fuori",
+  "tutte le label marcate needs_relabel: prodotte da modelli, non gold",
+  "deduplica contro tutti i benchmark del manifest",
+]
 title = "Gretel Synthetic Safety Alignment Dataset"
 authors = "Gretel"
 url = "https://huggingface.co/datasets/gretelai/gretel-safety-alignment-en-v1"
-changes = "nessun convertitore ancora"
-risks = ["interamente sintetico", "label da giudice LLM, non umane"]
+changes = "un caso per prompt e uno per ciascuna risposta concorde con Granite Guardian; verdetti dal ruolo della colonna; label marcate per la giuria di teacher; deduplica contro i benchmark"
+risks = ["interamente sintetico", "label da modelli, non umane: marcate needs_relabel", "prompt narrativi lunghi, non sempre una richiesta dannosa esplicita"]
 
 [[dataset]]
 name = "civil-comments"
@@ -230,11 +245,11 @@ labels_by = "punteggi di tossicità per attributo aggiunti da Jigsaw; processo d
 generators = ["nessun modello dichiarato"]
 generator_terms = "SÌ"
 generator_terms_note = "Testi umani; label da annotazione, nessun modello dichiarato."
-filters = ["soglia di tossicità da fissare nel convertitore", "deduplica contro tutti i benchmark del manifest"]
+filters = ["non convertito (scudo.ingest.UNCONVERTED): nessuna mappatura fedele al tri-state"]
 title = "Civil Comments"
 authors = "Borkan, D., Dixon, L., Sorensen, J., Thain, N., Vasserman, L., «Nuanced Metrics for Measuring Unintended Bias with Real Data for Text Classification»"
 url = "https://huggingface.co/datasets/google/civil_comments"
-changes = "nessun convertitore ancora"
+changes = "non convertito: le colonne sono punteggi di tossicità (frazione di valutatori), non label di policy; la domanda posta ai valutatori e la soglia non sono nel README, il numero di valutatori per riga non è nella copia HF e la fonte non ha id di riga. Una soglia sarebbe una label inventata."
 risks = ["tossicità, non policy LLM", "possibili dati personali nei commenti"]
 
 [[dataset]]
@@ -312,16 +327,32 @@ license = "mit"
 license_source = "API cardData.license e README"
 gated = false
 texts_by = "partecipanti umani alla challenge LLMail-Inject (subject e body delle email)"
-labels_by = "esiti della challenge (objectives: defense.undetected, exfil.sent), prodotti dal sistema con vittime GPT-4o mini e Phi-3"
-generators = ["nessun generatore di testo: GPT-4o mini e microsoft/Phi-3-medium-128k-instruct sono le vittime; output non usati"]
+labels_by = "esito registrato dal sistema del challenge per ogni invio (objectives JSON: email.retrieved, defense.undetected, exfil.sent, exfil.destination, exfil.content); scenario = livello, la lettera indica vittima e difesa (data/levels_descriptions.json)"
+generators = [
+  "nessun generatore di testo: subject e body scritti dai partecipanti",
+  "microsoft/Phi-3-medium-128k-instruct (mit): vittima; il suo esito exfil.sent è la label",
+  "GPT-4o mini (termini OpenAI): vittima; righe escluse dal filtro",
+]
 generator_terms = "SÌ"
-generator_terms_note = "Si usano solo subject e body scritti dai partecipanti; la colonna output non entra."
-filters = ["solo subject e body; colonna output esclusa", "tutte le righe sono tentativi di injection: servono negativi da altre fonti", "deduplica contro tutti i benchmark del manifest"]
+generator_terms_note = "Testi umani; la label è l'esito exfil.sent osservato solo sui livelli con vittima Phi-3 (MIT). Le righe con vittima GPT-4o mini restano fuori: il loro esito deriva da output OpenAI, termini da decidere. La colonna output non entra."
+filters = [
+  "solo livelli con vittima Phi-3 (lettere a c e g i k m o q s u di levels_descriptions.json)",
+  "solo invii con exfil.sent vero (l'assistente ha generato la chiamata API non chiesta): VIOLATION",
+  "invii senza exfil.sent esclusi: tentativi senza esito osservabile, mai negativi",
+  "evidenza nel formato del challenge «Subject of the email: <subject>.   Body: <body>»; colonna output esclusa",
+  "solo positivi: i negativi vengono da altre fonti",
+  "deduplica contro tutti i benchmark del manifest",
+]
 title = "LLMail-Inject: Adaptive Prompt Injection Challenge"
 authors = "Abdelnabi, S., Fay, A., Salem, A., Zverev, E., et al., «LLMail-Inject: A Dataset from a Realistic Adaptive Prompt Injection Challenge»"
 url = "https://huggingface.co/datasets/microsoft/llmail-inject-challenge"
-changes = "nessun convertitore ancora"
-risks = ["solo positivi", "molti tentativi ripetuti dalla stessa squadra"]
+changes = "selezione degli invii con chiamata API generata sui livelli Phi-3; email ricomposta nel formato del challenge; VIOLATION sul criterio injection.indirect; deduplica contro i benchmark"
+risks = [
+  "solo positivi",
+  "molti invii ripetuti (stesso subject e body su più livelli o dalla stessa squadra): deduplicare nel mix",
+  "label da un solo modello vittima: un attacco non riuscito su Phi-3 resta fuori anche se è un'injection",
+  "emails_for_fp_tests.json (203 email benigne) e le email degli scenari sono fuori dalla config e di autore NON VERIFICATO: non usati come negativi",
+]
 
 [[dataset]]
 name = "mosscap-prompt-injection"
@@ -341,11 +372,11 @@ labels_by = "nessuna label: il README avverte che molti prompt non sono injectio
 generators = ["ChatGPT: colonne answer e raw_answer, escluse"]
 generator_terms = "SÌ"
 generator_terms_note = "Entra solo la colonna prompt, scritta dai giocatori; le risposte ChatGPT restano fuori."
-filters = ["solo colonna prompt; answer e raw_answer escluse", "label da costruire con la giuria di teacher", "deduplica contro tutti i benchmark del manifest"]
+filters = ["non convertito (scudo.ingest.UNCONVERTED): servono label costruite dalla giuria di teacher"]
 title = "mosscap_prompt_injection"
 authors = "Lakera; Pfister, N., Volhejn, V., Knott, M., Arias, S., et al., «Gandalf the Red: Adaptive Security for LLMs», arXiv:2501.07927"
 url = "https://huggingface.co/datasets/Lakera/mosscap_prompt_injection"
-changes = "nessun convertitore ancora"
+changes = "non convertito: il README avverte che si pubblica ogni prompt ricevuto, injection o no, e molti non lo sono; non c'è label per riga e l'unico esito (password rivelata, risposta «🙅I was about to reveal the password») viene dalle risposte ChatGPT escluse. Marcare tutto VIOLATION inventerebbe le label."
 risks = ["label assenti", "possibili dati personali nei prompt"]
 
 [[dataset]]
@@ -387,16 +418,21 @@ license = "mit"
 license_source = "API cardData.license e README («jailbreak_llms is licensed under the terms of the MIT license»)"
 gated = false
 texts_by = "prompt raccolti da Reddit, Discord, siti (FlowGPT, ...) e dataset open-source, dic 2022 - dic 2023"
-labels_by = "colonna jailbreak assegnata dagli autori dello studio"
+labels_by = "colonna jailbreak (sempre vera in questa config): tag delle piattaforme (flair, canali, tag dei siti) e, per i dataset aperti, due autori (paper, §3); campione di 200 + 200 verificato da tre annotatori"
 generators = ["nessun modello dichiarato"]
 generator_terms = "SÌ"
 generator_terms_note = "Testi raccolti da utenti umani; nessun generatore dichiarato."
-filters = ["deduplica contro tutti i benchmark del manifest"]
+filters = ["jailbreak = VIOLATION con il criterio injection.direct", "prompt vuoti esclusi", "deduplica contro tutti i benchmark del manifest"]
 title = "In-The-Wild Jailbreak Prompts (jailbreak_2023_12_25)"
 authors = "Shen, X., Chen, Z., Backes, M., Shen, Y., Zhang, Y., «\"Do Anything Now\": Characterizing and Evaluating In-The-Wild Jailbreak Prompts on Large Language Models»"
 url = "https://huggingface.co/datasets/TrustAIRLab/in-the-wild-jailbreak-prompts"
-changes = "nessun convertitore ancora"
-risks = ["contenuti di utenti, possibili dati personali", "sovrapposto a jackhhao/jailbreak-classification (stessa fonte verazuo/jailbreak_llms)"]
+changes = "ogni prompt diventa VIOLATION sul criterio injection.direct; source_id = hash dei campi (la fonte non ha id); deduplica contro i benchmark"
+risks = [
+  "contenuti di utenti, possibili dati personali",
+  "1.405 righe, 1.364 testi distinti: il README raccomanda di deduplicare",
+  "39 testi compaiono anche nella config regular: conflitto di label da risolvere nel mix",
+  "sovrapposto a jackhhao/jailbreak-classification (stessa fonte verazuo/jailbreak_llms)",
+]
 
 [[dataset]]
 name = "in-the-wild-regular"
@@ -412,16 +448,24 @@ license = "mit"
 license_source = "API cardData.license e README («jailbreak_llms is licensed under the terms of the MIT license»)"
 gated = false
 texts_by = "prompt regolari raccolti dalle stesse piattaforme, dic 2022 - dic 2023"
-labels_by = "colonna jailbreak assegnata dagli autori dello studio"
+labels_by = "colonna jailbreak (sempre falsa in questa config): prompt senza tag jailbreak delle piattaforme, «considered regular» (paper, §3); campione di 200 verificato da tre annotatori"
 generators = ["nessun modello dichiarato"]
 generator_terms = "SÌ"
 generator_terms_note = "Testi raccolti da utenti umani; nessun generatore dichiarato."
-filters = ["negativi per injection_direct", "deduplica contro tutti i benchmark del manifest"]
+filters = [
+  "regular = NO_VIOLATION con il criterio injection.direct, marcato needs_relabel: negativo per assenza del tag, non per verifica, e spesso role-play vicino ai jailbreak (paper)",
+  "prompt vuoti esclusi",
+  "deduplica contro tutti i benchmark del manifest",
+]
 title = "In-The-Wild Jailbreak Prompts (regular_2023_12_25)"
 authors = "Shen, X., Chen, Z., Backes, M., Shen, Y., Zhang, Y., «\"Do Anything Now\": Characterizing and Evaluating In-The-Wild Jailbreak Prompts on Large Language Models»"
 url = "https://huggingface.co/datasets/TrustAIRLab/in-the-wild-jailbreak-prompts"
-changes = "nessun convertitore ancora"
-risks = ["contenuti di utenti, possibili dati personali"]
+changes = "ogni prompt diventa NO_VIOLATION sul criterio injection.direct, da confermare con la giuria di teacher; source_id = hash dei campi; deduplica contro i benchmark"
+risks = [
+  "contenuti di utenti, possibili dati personali",
+  "falsi negativi: jailbreak senza tag finiscono qui; 39 testi compaiono anche nella config jailbreak e 12 jailbreak di jackhhao sono qui",
+  "13.735 righe, 13.199 testi distinti",
+]
 
 [[dataset]]
 name = "yanismiraoui-prompt-injections"
@@ -466,12 +510,12 @@ labels_by = "colonna type (jailbreak/benign) per fonte"
 generators = ["benigni GPTeacher e OpenOrca: generati con modelli OpenAI, esclusi dal filtro"]
 generator_terms = "SÌ"
 generator_terms_note = "Entrano solo le righe type = jailbreak, raccolte da utenti umani; i benigni generati con modelli OpenAI restano fuori."
-filters = ["solo righe type = jailbreak", "deduplica contro tutti i benchmark del manifest"]
+filters = ["split train della config default = balanced/jailbreak_dataset_train_balanced.csv", "solo righe type = jailbreak: VIOLATION con il criterio injection.direct", "deduplica contro tutti i benchmark del manifest"]
 title = "Jailbreak Classification"
 authors = "jackhhao"
 url = "https://huggingface.co/datasets/jackhhao/jailbreak-classification"
-changes = "nessun convertitore ancora"
-risks = ["sovrapposto a in-the-wild-jailbreak (stessa fonte)"]
+changes = "selezione delle righe jailbreak; VIOLATION sul criterio injection.direct; source_id = hash del prompt; deduplica contro i benchmark"
+risks = ["sovrapposto a in-the-wild-jailbreak (362 dei 527 jailbreak del train)", "12 jailbreak compaiono tra i prompt regular di in-the-wild: conflitto da risolvere nel mix", "solo positivi"]
 
 [[dataset]]
 name = "nemotron-rl-indirect-injection"
@@ -500,6 +544,103 @@ authors = "NVIDIA Corporation"
 url = "https://huggingface.co/datasets/nvidia/Nemotron-RL-Agentic-Indirect-Prompt-Injection-v1"
 changes = "nessun convertitore ancora"
 risks = ["testi adversarial sintetici", "contesto agentico oltre la v1: si usa solo il testo iniettato"]
+
+# --- Training: criteri personalizzati (issue #6) ---------------------------
+
+[[dataset]]
+name = "open-jev-train"
+id = "ZefanCai/Open-Jev"
+role = "train"
+revision = "c67699e13d0ae25e35b77165a4b6b079bedc8aba"
+read_on = "2026-10-15"
+config = "release-v2-redistributable"
+splits = ["train"]
+languages = ["en"]
+surfaces = ["prompt"]
+license = "cc0-1.0"
+license_source = "API cardData.license e README («Original generated records are marked CC0-1.0»; codice MIT, file LICENSE-DATA e LICENSE-CODE-MIT); la dedica non copre testi upstream"
+gated = false
+texts_by = "progetto Open-Jev: task «controlled, mostly synthetic» (customer support, workflow locali, geometria, Snake, tic-tac-toe, ViZDoom, ragionamento controllato); descrizioni delle domande customer-control dalla documentazione TypeSafe"
+labels_by = "target di riferimento della fonte (regole, oracoli programmatici, script expert); metadata_json può contenere label teacher privilegiate (mai lette); modello teacher NON VERIFICATO"
+generators = ["teacher o generatore LLM: NON VERIFICATO (il README non lo nomina)"]
+generator_terms = "INCERTO"
+generator_terms_note = "Il README dichiara record «mostly synthetic» e label teacher privilegiate nei metadati, ma non nomina il modello teacher: i suoi termini d'uso non sono verificabili. Serve una decisione umana."
+filters = [
+  "solo domande noul con opzioni [no, yes] e target netto: yes = VIOLATION, no = NO_VIOLATION",
+  "choice, score, target non netti e opzioni inattese esclusi con il motivo",
+  "source customer-control-v1 esclusa: descrizioni TypeSafe senza licenza verificata",
+  "metadata_json e record_json mai letti",
+  "deduplica contro tutti i benchmark del manifest, compreso open-jev-heldout",
+]
+title = "Open-Jev: typed decision datasets (release-v2-redistributable)"
+authors = "ZefanCai (Hugging Face), progetto Open-Jev (github.com/Zefan-Cai/Open-Jev-Dev)"
+url = "https://huggingface.co/datasets/ZefanCai/Open-Jev"
+changes = "domanda come criterio e stato decodificato come evidenza (superficie prompt); selezione delle domande sì/no con target netto; deduplica contro i benchmark"
+risks = [
+  "teacher non dichiarato: bloccato dal cancello fino a una decisione umana",
+  "domini non testuali in senso stretto (pixel, giochi): il peso nel mix lo decide il costruttore del mix",
+  "test e OOD hanno label pubbliche: registrati come benchmark open-jev-heldout, mai training",
+]
+
+[[dataset]]
+name = "canttalk-train"
+id = "nvidia/CantTalkAboutThis-Topic-Control-Dataset"
+role = "train"
+revision = "b015ae8902d8429ce32ebfed9f9935f891d10ed5"
+read_on = "2026-10-15"
+config = "mixtral"
+splits = ["train"]
+languages = ["en"]
+surfaces = ["prompt"]
+license = "cc-by-4.0"
+license_source = "API cardData.license e README («License: CC-BY-4.0»)"
+gated = false
+texts_by = "dialoghi, policy di sistema e distrattori generati con mistralai/Mixtral-8x7B-Instruct-v0.1 (versione «commercially friendly», README)"
+labels_by = "costruzione del dataset: turni utente del dialogo in tema, distrattori fuori tema (paper arXiv:2404.03820)"
+generators = ["mistralai/Mixtral-8x7B-Instruct-v0.1 (apache-2.0): dialoghi e distrattori"]
+generator_terms = "SÌ"
+generator_terms_note = "Unico generatore dichiarato, apache-2.0 (licenza letta dall'API del modello)."
+filters = [
+  "ogni turno utente di conversation = NO_VIOLATION; ogni distrattore, inserito dopo il turno assistente con il suo bot turn, = VIOLATION",
+  "bot turn assente o ambiguo: distrattore escluso; conversation vuota: riga esclusa",
+  "conversation_with_distractors non usato",
+  "deduplica contro tutti i benchmark del manifest, compreso canttalk-test",
+]
+title = "CantTalkAboutThis Topic Control Dataset (mixtral)"
+authors = "NVIDIA; Sreedhar, M., Rebedea, T., Ghosh, S., Zeng, J., Parisien, C., «CantTalkAboutThis: Aligning Language Models to Stay on Topic in Dialogues», Findings of EMNLP 2024"
+url = "https://huggingface.co/datasets/nvidia/CantTalkAboutThis-Topic-Control-Dataset"
+changes = "criterio = policy di sistema più la domanda del paper girata su VIOLATION; evidenza = dialogo fino al turno giudicato in JSON; source_id = hash di policy e dialogo; deduplica contro i benchmark"
+risks = ["interamente sintetico", "distrattori più semplici di quelli reali (README)", "alcuni turni originali toccano sotto-temi vietati dalla policy: la label segue il dataset"]
+
+[[dataset]]
+name = "procedural-train"
+id = "tasksource/procedural-typed-decisions"
+role = "train"
+revision = "e4b21b7b55f6cc9e76e33563e9d604ac5fcd25ad"
+read_on = "2026-10-15"
+config = "all"
+splits = ["train"]
+languages = ["en"]
+surfaces = ["prompt"]
+license = "apache-2.0"
+license_source = "API cardData.license e README"
+gated = false
+texts_by = "generazione procedurale deterministica con tasksource (riga i seminata da task:split:i, README)"
+labels_by = "risposte calcolate esattamente dallo stato con le regole che lo stato stesso dichiara (README)"
+generators = ["nessun modello: generatori procedurali di tasksource (src/tasksource/jev/procedural)"]
+generator_terms = "SÌ"
+generator_terms_note = "Nessun LLM nella generazione di testi e label."
+filters = [
+  "noul sì/no: 1 = VIOLATION, 0 = NO_VIOLATION; noul graduati esclusi",
+  "record_eligibility probe_eligibility e requirement_status: tri-state con criterio riscritto (sconosciuto = INSUFFICIENT per definizione dello stato)",
+  "altre choice e score esclusi con il motivo",
+  "deduplica contro tutti i benchmark del manifest",
+]
+title = "procedural-typed-decisions"
+authors = "tasksource; Sileo, D., «tasksource: A Large Collection of NLP tasks with a Structured Dataset Preprocessing Framework», LREC-COLING 2024"
+url = "https://huggingface.co/datasets/tasksource/procedural-typed-decisions"
+changes = "domanda (o criterio riscritto per record_eligibility) come criterio e stato verbatim come evidenza; selezione delle domande esprimibili nel tri-state; deduplica contro i benchmark"
+risks = ["dominio non safety: decisioni procedurali", "stati lunghi e templati"]
 
 # --- Benchmark held-out (solo valutazione) ----------------------------------
 
@@ -710,3 +851,55 @@ url = "https://huggingface.co/datasets/bench-llm/or-bench"
 changes = "solo valutazione"
 risks = ["hard-1k e toxic vanno tenuti fuori anche da or-bench-80k se entrasse nel training"]
 text_fields = ["prompt"]
+
+[[dataset]]
+name = "canttalk-test"
+id = "nvidia/CantTalkAboutThis-Topic-Control-Dataset"
+role = "benchmark"
+revision = "b015ae8902d8429ce32ebfed9f9935f891d10ed5"
+read_on = "2026-10-15"
+config = "mixtral"
+splits = ["test"]
+languages = ["en"]
+surfaces = ["prompt"]
+license = "cc-by-4.0"
+license_source = "API cardData.license e README"
+gated = false
+texts_by = "dialoghi sintetici; distrattori scritti da due esperti (paper), «human annotated» (README); file canttalkaboutthis_topic_control_human_test_set.jsonl"
+labels_by = "costruzione del dataset e annotazione umana dei distrattori"
+generators = ["come canttalk-train per i dialoghi"]
+generator_terms = "SÌ"
+generator_terms_note = "Solo valutazione."
+filters = ["indicizzati system_instruction e le evidenze dei casi di scudo.canttalk: il dialogo è una lista e l'indice vede solo testo"]
+title = "CantTalkAboutThis Topic Control Dataset, split test (distrattori umani)"
+authors = "NVIDIA; Sreedhar, M., Rebedea, T., Ghosh, S., Zeng, J., Parisien, C., Findings of EMNLP 2024"
+url = "https://huggingface.co/datasets/nvidia/CantTalkAboutThis-Topic-Control-Dataset"
+changes = "solo valutazione"
+risks = ["20 dialoghi: stime imprecise", "letto il 2026-10-15: nessuna policy del test nel train, 3 turni su 418 in comune"]
+text_fields = ["system_instruction"]
+
+[[dataset]]
+name = "open-jev-heldout"
+id = "ZefanCai/Open-Jev"
+role = "benchmark"
+revision = "c67699e13d0ae25e35b77165a4b6b079bedc8aba"
+read_on = "2026-10-15"
+config = "release-v2-redistributable"
+splits = ["test", "ood"]
+languages = ["en"]
+surfaces = ["prompt"]
+license = "cc0-1.0"
+license_source = "API cardData.license e README"
+gated = false
+texts_by = "come open-jev-train"
+labels_by = "come open-jev-train; label pubbliche («future work must disclose any use of them», README)"
+generators = ["come open-jev-train"]
+generator_terms = "INCERTO"
+generator_terms_note = "Teacher non dichiarato; irrilevante per la sola valutazione."
+filters = ["indicizzati state_json e le evidenze dei casi di scudo.open_jev"]
+title = "Open-Jev: typed decision datasets (release-v2-redistributable), split test e ood"
+authors = "ZefanCai (Hugging Face), progetto Open-Jev (github.com/Zefan-Cai/Open-Jev-Dev)"
+url = "https://huggingface.co/datasets/ZefanCai/Open-Jev"
+changes = "solo valutazione"
+risks = ["stati templati: la deduplica near-duplicate può rimuovere molti casi di open-jev-train", "OOD specifico per fonte, non un benchmark universale (README)"]
+text_fields = ["state_json"]

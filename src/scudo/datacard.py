@@ -41,7 +41,7 @@ def render(entry: Entry, stats: dict | None = None) -> str:
                else "nessuna")
     if stats:
         rows = (f"{stats['rows']} lette; {stats['cases']} casi; {stats['kept']} tenuti dopo la "
-                f"deduplica; {stats['needs_relabel']} da rietichettare (llm_jury)")
+                f"deduplica; {stats['needs_relabel']} da rietichettare (label non gold)")
         dropped = _counts(stats["dropped"])
         removed = (f"esatte {_counts(stats['removed_exact'])}; "
                    f"near-duplicate {_counts(stats['removed_near'])}")
@@ -71,8 +71,8 @@ Generata da `src/scudo/manifest.toml`; ruolo `{entry.role}`.
 - Label prodotte da: {entry.labels_by}
 - Generatori e licenze:
 {_items(entry.generators)}
-- Teacher usati da noi: nessuno in ingestione; le label `llm_jury` sono marcate per la
-  giuria di teacher.
+- Teacher usati da noi: nessuno in ingestione; le label non gold (`needs_relabel`) sono
+  marcate per la giuria di teacher.
 - Termini d'uso dei generatori compatibili con il training: {entry.generator_terms}.
   {entry.generator_terms_note}
 - Decisione umana: {decided}

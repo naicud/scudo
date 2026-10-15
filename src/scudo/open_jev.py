@@ -51,6 +51,15 @@ def cases_from_row(row: dict) -> tuple[list[Case], Counter]:
     return [case], Counter()
 
 
+# Ingestione (`scudo.ingest`): casi e scarti per motivo di una riga.
+convert_row = cases_from_row
+
+
+def needs_relabel(row: dict, case: Case) -> bool:
+    """Target di riferimento della fonte; il teacher non dichiarato blocca il cancello."""
+    return False
+
+
 def convert(rows: Iterable[dict]) -> tuple[list[Case], Counter]:
     cases, dropped = [], Counter()
     for row in rows:

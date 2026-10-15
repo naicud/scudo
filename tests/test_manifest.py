@@ -3,6 +3,7 @@ from dataclasses import replace
 import pytest
 
 from scudo import aegis, nemotron
+from scudo.ingest import CONVERTERS, UNCONVERTED
 from scudo.manifest import (
     Decision,
     Entry,
@@ -120,11 +121,28 @@ def test_converter_revisions_match_the_manifest():
     by_name = {entry.name: entry for entry in load()}
     assert by_name["aegis2-train"].revision == aegis.REVISION
     assert by_name["nemotron3-train"].revision == nemotron.REVISION
+    for entry in load():
+        converter = CONVERTERS.get(entry.id)
+        if converter is None:
+            continue
+        assert entry.revision == converter.REVISION, entry.name
+        assert entry.config == getattr(converter, "CONFIG", entry.config), entry.name
+
+
+def test_every_converted_training_source_is_in_the_manifest():
+    trained = {entry.id for entry in training()}
+    assert set(CONVERTERS) <= trained
+    assert set(UNCONVERTED) <= trained
+
+
+def test_open_jev_is_blocked_until_a_human_decides_on_its_teacher():
+    [problem] = [p for p in problems(load()) if p.startswith("open-jev-train:")]
+    assert "INCERTO" in problem
 
 
 def test_registry_lists_the_held_out_benchmarks():
     names = {entry.name for entry in benchmarks()}
     assert {"aegis2-test", "nemotron3-test", "xstest", "wildguardtest", "toxicchat-test",
-            "jbb-behaviors", "orbench-hard"} <= names
+            "jbb-behaviors", "orbench-hard", "canttalk-test", "open-jev-heldout"} <= names
     assert all(entry.role == "benchmark" for entry in benchmarks())
     assert all(entry.role == "train" for entry in training())

@@ -4,8 +4,8 @@ from pathlib import Path
 
 import pytest
 
-from scudo import aegis
-from scudo.ingest import REPO_ROOT, build, check_outside_repo
+from scudo import aegis, canttalk, procedural
+from scudo.ingest import CONVERTERS, REPO_ROOT, UNCONVERTED, build, check_outside_repo
 from scudo.manifest import ManifestError
 from test_manifest import BENCH, TRAIN
 
@@ -89,6 +89,64 @@ def test_build_filters_marks_dedups_and_reports(tmp_path):
     assert json.loads((out / "report.json").read_text()) == report
     assert (out / "data-cards" / "aegis2-train.md").exists()
     assert "Demo" in (out / "data-cards" / "ATTRIBUTIONS.md").read_text()
+
+
+def test_registry_exposes_the_ingest_contract_for_every_converter():
+    for dataset, converter in CONVERTERS.items():
+        assert converter.DATASET == dataset
+        assert callable(converter.needs_relabel)
+        assert callable(getattr(converter, "convert_row", None)) or (
+            callable(converter.drop_reason) and callable(converter.cases_from_row))
+    assert not set(UNCONVERTED) & set(CONVERTERS)
+
+
+PTD = replace(TRAIN, name="ptd-train", id=procedural.DATASET, config="all")
+PTD_ROW = {
+    "id": "graph_navigation:train:7", "task": "graph_navigation", "level": 0,
+    "state": '{"nodes": ["N1", "N2"]}',
+    "questions": json.dumps({
+        "reachable": {"type": "noul", "instructions": "Does any route exist?"},
+        "shortest_cost": {"type": "score", "instructions": "Cost?", "criteria": ["0", "1"]}}),
+    "answers": json.dumps({
+        "reachable": {"type": "noul", "noul": 1.0},
+        "shortest_cost": {"type": "score", "score": 1.0}}),
+}
+
+
+def test_partial_drops_inside_a_row_are_counted_by_reason(tmp_path):
+    def rows(entry, split):
+        return iter([PTD_ROW] if entry.id == procedural.DATASET else ROWS[entry.id])
+
+    report = build(tmp_path / "out", entries=[PTD, HELD], loader=rows)
+    source = report["sources"]["ptd-train"]
+    assert (source["rows"], source["cases"], source["kept"]) == (1, 1, 1)
+    assert source["dropped"] == {"score_not_tristate": 1}
+
+
+CTAT_ROW = {
+    "domain": "real estate", "scenario": "Downsizing.",
+    "system_instruction": "Help the user downsize. Do not discuss financing.",
+    "conversation": [{"role": "user", "content": "Hi, I'm considering downsizing my home."},
+                     {"role": "assistant", "content": "Downsizing can lower costs."}],
+    "distractors": [], "conversation_with_distractors": [],
+}
+CTAT_TRAIN = replace(TRAIN, name="ctat-train", id=canttalk.DATASET, config="mixtral")
+CTAT_TEST = replace(BENCH, name="ctat-test", id=canttalk.DATASET, config="mixtral",
+                    text_fields=("system_instruction",))
+
+
+def test_benchmark_with_a_converter_is_indexed_in_the_evidence_form(tmp_path):
+    # Il dialogo è una lista: senza il convertitore l'indice vedrebbe solo la policy.
+    report = build(tmp_path / "out", entries=[CTAT_TRAIN, CTAT_TEST],
+                   loader=lambda entry, split: iter([CTAT_ROW]))
+    assert report["benchmarks"]["ctat-test"]["texts"] == 2  # policy + un caso
+    assert report["sources"]["ctat-train"]["removed_exact"] == {"ctat-test": 1}
+
+
+def test_sources_without_a_faithful_mapping_report_why(tmp_path):
+    civil = replace(TRAIN, name="civil-comments", id="google/civil_comments")
+    report = build(tmp_path / "out", entries=[civil, HELD], loader=loader)
+    assert report["not_ingested"]["civil-comments"] == UNCONVERTED["google/civil_comments"]
 
 
 def test_build_is_deterministic(tmp_path):

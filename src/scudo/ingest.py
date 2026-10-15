@@ -2,12 +2,13 @@
 
 `python -m scudo.ingest check` elenca i motivi di blocco del cancello.
 `python -m scudo.ingest build --out DIR` passa il cancello, scarica alle
-revisioni fissate (cache in `DIR/hf-cache`), indicizza i testi dei benchmark,
+revisioni fissate (cache in `DIR/hf-cache`), indicizza i testi dei benchmark
+(campi di testo ed evidenze dei casi, se il benchmark ha un convertitore),
 converte le fonti con un convertitore, conta gli scarti per motivo, marca le
-label `llm_jury`, rimuove i duplicati esatti e near-duplicate dei benchmark e
-scrive in DIR i casi JSONL, `report.json` e le data card. DIR deve stare fuori
-dal repository e da ogni work tree git: i dati restano nel perimetro
-autorizzato. `cards --out DIR` scrive solo le data card dal manifest.
+label non gold (`needs_relabel`), rimuove i duplicati esatti e near-duplicate
+dei benchmark e scrive in DIR i casi JSONL, `report.json` e le data card. DIR
+deve stare fuori dal repository e da ogni work tree git: i dati restano nel
+perimetro autorizzato. `cards --out DIR` scrive solo le data card dal manifest.
 """
 
 import argparse
@@ -21,14 +22,50 @@ from dataclasses import asdict
 from functools import partial
 from pathlib import Path
 
-from scudo import aegis, datacard, nemotron
+from scudo import (
+    aegis,
+    aegis1,
+    aya,
+    canttalk,
+    datacard,
+    gretel,
+    in_the_wild,
+    jackhhao,
+    llmail,
+    nemotron,
+    open_jev,
+    procedural,
+)
+from scudo.cases import Case
 from scudo.dedup import BANDS, BINS, ROWS, SHINGLE, THRESHOLD, Index
 from scudo.manifest import MANIFEST, Entry, ManifestError, benchmarks, gate, load, training
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
-# Un convertitore espone drop_reason, cases_from_row e needs_relabel.
-CONVERTERS = {aegis.DATASET: aegis, nemotron.DATASET: nemotron}
+# Un convertitore espone needs_relabel e drop_reason con cases_from_row, oppure
+# convert_row se scarta parti di riga (domande, distrattori, risposte).
+CONVERTERS = {module.DATASET: module for module in (
+    aegis, nemotron, aegis1, aya, gretel, llmail, in_the_wild, jackhhao,
+    open_jev, canttalk, procedural,
+)}
+# Fonti di training senza una mappatura fedele al tri-state: il motivo va nel report.
+UNCONVERTED = {
+    "google/civil_comments": (
+        "punteggi di tossicità (frazione di valutatori), non label di policy: domanda ai "
+        "valutatori e soglie non documentate nel README, numero di valutatori assente"),
+    "Lakera/mosscap_prompt_injection": (
+        "nessuna label per riga: il README avverte che molti prompt non sono injection e "
+        "l'unico esito (password rivelata) viene dalle risposte ChatGPT escluse"),
+}
 Loader = Callable[[Entry, str], Iterable[dict]]
+
+
+def _convert(converter, row: dict) -> tuple[list[Case], Counter]:
+    """Casi di una riga e scarti per motivo."""
+    if hasattr(converter, "convert_row"):
+        return converter.convert_row(row)
+    if reason := converter.drop_reason(row):
+        return [], Counter({reason: 1})
+    return converter.cases_from_row(row), Counter()
 
 
 def check_outside_repo(out: Path) -> Path:
@@ -62,13 +99,18 @@ def load_rows(entry: Entry, split: str, *, cache_dir: Path) -> Iterable[dict]:
 
 
 def _index(entries: list[Entry], loader: Loader) -> Index:
+    """Testi dei benchmark; con un convertitore anche le evidenze nella forma del training."""
     index = Index()
     for bench in entries:
+        converter = CONVERTERS.get(bench.id)
         for split in bench.splits:
             for row in loader(bench, split):
-                for field in bench.text_fields:
-                    if isinstance(row.get(field), str) and row[field].strip():
-                        index.add(bench.name, row[field])
+                texts = [row[field] for field in bench.text_fields
+                         if isinstance(row.get(field), str) and row[field].strip()]
+                if converter is not None:
+                    texts += [case.evidence for case in _convert(converter, row)[0]]
+                for text in dict.fromkeys(texts):
+                    index.add(bench.name, text)
     return index
 
 
@@ -79,10 +121,9 @@ def _ingest(entry: Entry, converter, loader: Loader, index: Index, path: Path) -
         for split in entry.splits:
             for row in loader(entry, split):
                 stats["rows"] += 1
-                if reason := converter.drop_reason(row):
-                    stats["dropped"][reason] += 1
-                    continue
-                for case in converter.cases_from_row(row):
+                cases, dropped = _convert(converter, row)
+                stats["dropped"].update(dropped)
+                for case in cases:
                     stats["cases"] += 1
                     if hit := index.match(case.evidence):
                         kind, bench = hit
@@ -132,7 +173,7 @@ def build(out: Path, *, entries: list[Entry] | None = None, loader: Loader | Non
     for entry in training(entries):
         converter = CONVERTERS.get(entry.id)
         if converter is None:
-            report["not_ingested"][entry.name] = "nessun convertitore"
+            report["not_ingested"][entry.name] = UNCONVERTED.get(entry.id, "nessun convertitore")
             continue
         stats = _ingest(entry, converter, loader, index, out / f"{entry.name}.jsonl")
         for kind in ("exact", "near"):

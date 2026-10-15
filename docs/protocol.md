@@ -121,7 +121,7 @@ sensore con le label su casi che la policy vieta ma che non sono assistenza
 attuabile.
 
 Il tracer non costruisce casi `INSUFFICIENT` (per quelli generati, i criteri
-personalizzati e i criteri di default v0 vedi
+personalizzati e i criteri di default vedi
 [`criteri-personalizzati.md`](criteri-personalizzati.md)): le sue etichette sono
 solo `unsafe` e `safe`, mappate a `VIOLATION` e `NO_VIOLATION`. Le righe
 `refusal_data_augmentation` e i prompt `REDACTED` restano fuori.
