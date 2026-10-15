@@ -80,7 +80,9 @@ EVAL = {
     "per_benchmark": 500,
     # Report della build di ingestione (`python -m scudo.ingest build`), in un repository
     # privato a un commit fissato. Vuoto: verifica della deduplica NOT_RUN nei report.
-    "ingest_report": {"repo": "", "repo_type": "dataset", "revision": "", "path": "report.json"},
+    "ingest_report": {"repo": "Naicud/scudo-ingest", "repo_type": "dataset",
+                      "revision": "a7fa42d4962edb0a6cbf4bb9fa3c5f6ecc8a443e",
+                      "path": "ingest-7b735f0/report.json"},
     # I nostri Fast, sugli stessi casi e con lo stesso seme: il tracer (#2) e i candidati
     # del bake-off (scudo.base_models). adapter_revision e' il commit dell'upload
     # dell'adapter (RUN_LOG["adapter"] del notebook di training); vuoto: Fast saltato.

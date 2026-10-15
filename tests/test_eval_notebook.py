@@ -91,10 +91,20 @@ def test_fast_points_at_the_tracer_adapter_upload():
         code_cells(build()))
 
 
-def fast_entries():
+def eval_config():
     source = next(c for c in code_cells(build()) if "EVAL = {" in c)
-    body = source.split("EVAL = ", 1)[1].split("\nRUN_LOG", 1)[0]
-    return ast.literal_eval(body)["fast"]
+    return ast.literal_eval(source.split("EVAL = ", 1)[1].split("\nRUN_LOG", 1)[0])
+
+
+def fast_entries():
+    return eval_config()["fast"]
+
+
+def test_dedup_reads_the_real_ingest_build_at_a_pinned_commit():
+    source = eval_config()["ingest_report"]
+    assert source == {"repo": "Naicud/scudo-ingest", "repo_type": "dataset",
+                      "revision": "a7fa42d4962edb0a6cbf4bb9fa3c5f6ecc8a443e",
+                      "path": "ingest-7b735f0/report.json"}
 
 
 def test_fast_is_a_list_with_the_tracer_first_then_every_bakeoff_candidate():
