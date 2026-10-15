@@ -1,21 +1,17 @@
 """Casi del tracer da `nvidia/Nemotron-Safety-Guard-Dataset-v3` (CC-BY-4.0), solo IT/EN.
 
-Una riga dà un caso sulla richiesta (superficie `input`, evidenza = prompt) e,
-se la risposta ha una label, un caso sulla risposta (superficie `output`,
+Una riga dà un caso sulla richiesta (superficie `prompt`, evidenza = prompt) e,
+se la risposta ha una label, un caso sulla risposta (superficie `response`,
 evidenza = sola risposta, come la superficie output del gateway). Restano fuori
 le righe `refusal_data_augmentation` (rifiuti generati con Gemma, termini propri)
 e i prompt `REDACTED`. Il tracer non costruisce casi INSUFFICIENT (issue #6).
 """
 
 import hashlib
-import random
 from collections.abc import Iterable, Sequence
-from dataclasses import dataclass
-from typing import Literal
 
-from scudo.protocol import Verdict, training_row
-
-Surface = Literal["input", "output"]
+from scudo.cases import Case
+from scudo.protocol import Verdict
 
 DATASET = "nvidia/Nemotron-Safety-Guard-Dataset-v3"
 REVISION = "a3f7ecb3433d1933701a83f18de16c36934a7f51"
@@ -42,16 +38,6 @@ HARMFUL_RESPONSE = (
 _LABELS = {"unsafe": "VIOLATION", "safe": "NO_VIOLATION"}
 
 
-@dataclass(frozen=True)
-class Case:
-    source_id: str
-    language: str
-    surface: Surface
-    criterion: str
-    evidence: str
-    verdict: Verdict
-
-
 def _verdict(label: str) -> Verdict:
     try:
         return _LABELS[label]
@@ -68,14 +54,14 @@ def cases_from_row(row: dict) -> list[Case]:
         return []
     if row.get("response_label_source") in EXCLUDED_RESPONSE_SOURCES:
         return []
-    base = {"source_id": row["id"], "language": row["language"]}
+    base = {"source": DATASET, "source_id": row["id"], "language": row["language"]}
     cases = [
-        Case(**base, surface="input", criterion=HARMFUL_REQUEST, evidence=row["prompt"],
+        Case(**base, surface="prompt", criterion=HARMFUL_REQUEST, evidence=row["prompt"],
              verdict=_verdict(row["prompt_label"]))
     ]
     if _has_text(row.get("response")) and _has_text(row.get("response_label")):
         cases.append(
-            Case(**base, surface="output", criterion=HARMFUL_RESPONSE, evidence=row["response"],
+            Case(**base, surface="response", criterion=HARMFUL_RESPONSE, evidence=row["response"],
                  verdict=_verdict(row["response_label"]))
         )
     return cases
@@ -98,20 +84,6 @@ def sample_cases(rows: Iterable[dict], *, per_language: int, seed: int) -> list[
             raise ValueError(f"{language}: {len(pool)} casi, ne servono {per_language}")
         sample.extend(pool[:per_language])
     return sample
-
-
-def training_rows(cases: Sequence[Case], *, seed: int) -> list[dict]:
-    rng = random.Random(seed)
-    return [
-        {
-            **training_row(case.criterion, case.evidence, case.verdict, rng),
-            "language": case.language,
-            "source_id": case.source_id,
-            "surface": case.surface,
-            "verdict": case.verdict,
-        }
-        for case in cases
-    ]
 
 
 def heldout_cases(

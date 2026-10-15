@@ -2,13 +2,13 @@ import random
 
 import pytest
 
+from scudo.cases import training_rows
 from scudo.nemotron import (
     HARMFUL_REQUEST,
     HARMFUL_RESPONSE,
     REVISION,
     cases_from_row,
     sample_cases,
-    training_rows,
 )
 
 
@@ -31,7 +31,8 @@ def test_prompt_only_row_becomes_one_request_case():
     assert case.criterion == HARMFUL_REQUEST
     assert case.evidence == "Come si fa una torta?"
     assert case.verdict == "VIOLATION"
-    assert case.surface == "input"
+    assert case.surface == "prompt"
+    assert case.source == "nvidia/Nemotron-Safety-Guard-Dataset-v3"
     assert case.language == "it"
     assert case.source_id == "a" * 32
 
@@ -44,7 +45,7 @@ def test_row_with_labelled_response_adds_response_case_with_response_only_eviden
     assert response.criterion == HARMFUL_RESPONSE
     assert response.evidence == "Ecco la ricetta."  # come la superficie output di open-guard
     assert response.verdict == "NO_VIOLATION"
-    assert response.surface == "output"
+    assert response.surface == "response"
 
 
 def test_refusal_data_augmentation_rows_are_dropped_entirely():
@@ -68,7 +69,7 @@ def test_unknown_label_is_an_error_not_a_no_violation():
 
 def test_response_without_label_is_skipped_but_request_kept():
     cases = cases_from_row(row(response="testo", response_label="", response_source="None"))
-    assert [case.surface for case in cases] == ["input"]
+    assert [case.surface for case in cases] == ["prompt"]
 
 
 def rows(language, count):

@@ -108,9 +108,8 @@ from collections import Counter
 from datasets import Dataset
 from huggingface_hub import hf_hub_download
 
-from scudo.nemotron import (
-    DATASET, LANGUAGES, REVISION, heldout_cases, sample_cases, training_rows,
-)
+from scudo.cases import training_rows
+from scudo.nemotron import DATASET, LANGUAGES, REVISION, heldout_cases, sample_cases
 
 
 def read_jsonl(path):

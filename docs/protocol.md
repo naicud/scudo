@@ -2,7 +2,7 @@
 
 Formato versionato condiviso da training e serving. Il termine **criterio
 semantico**, i verdetti e le superfici seguono [`CONTEXT.md`](../CONTEXT.md).
-Fonte: `src/scudo/protocol.py`, `src/scudo/nemotron.py`,
+Fonte: `src/scudo/protocol.py`, `src/scudo/cases.py`, `src/scudo/nemotron.py`,
 `src/scudo/artifacts.py`, `src/scudo/eval_report.py`; il golden è in
 `tests/test_protocol.py`.
 
@@ -66,7 +66,7 @@ Il completamento è una sola lettera, `A`, `B` o `C`.
   stesse righe.
 - Il gold compare solo nella lettera di `completion`: il prompt contiene le
   tre opzioni in ordine casuale, senza indicazione del verdetto corretto.
-- La riga contiene anche `verdict`, `semantic_ids`, `language`, `source_id` e
+- La riga contiene anche `verdict`, `semantic_ids`, `source`, `language`, `source_id` e
   `surface` per audit. Il trainer deve usare solo `prompt` e `completion`.
 
 ## Serving
@@ -88,10 +88,13 @@ errore del provider non diventano un verdetto.
 
 | Superficie | Input del criterio | `untrusted_evidence` |
 |------------|--------------------|----------------------|
-| `input`    | richiesta dell'utente | prompt utente |
-| `output`   | risposta del modello  | sola risposta del modello |
+| `prompt`   | richiesta dell'utente | prompt utente |
+| `response` | risposta del modello  | sola risposta del modello |
+| `injection_direct` | richiesta dell'utente con istruzioni che tentano di scavalcare il sistema | prompt utente |
+| `injection_indirect` | contenuto di terzi (documento, pagina, email) letto dal modello | solo il contenuto di terzi |
+| `over_refusal` | richiesta benigna che sembra dannosa | prompt utente |
 
-Limite: la superficie `output` non vede il prompt che ha prodotto la risposta.
+Limite: la superficie `response` non vede il prompt che ha prodotto la risposta.
 Un giudizio su una risposta isolata può essere sbagliato se la risposta dipende
 dal contesto. È lo stesso limite della superficie output di open-guard, che non
 passa il prompt.

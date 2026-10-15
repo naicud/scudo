@@ -62,6 +62,15 @@ _Avoid_: retry, seconda opinione facoltativa.
 
 ### Dati e valutazione
 
+**Superficie**:
+La copertura v1 da cui viene l'evidenza di un caso: `prompt` (richiesta
+dell'utente), `response` (risposta del modello), `injection_direct`,
+`injection_indirect` (contenuto di terzi letto dal modello), `over_refusal`
+(richiesta benigna che sembra dannosa). `INSUFFICIENT` è un verdetto, non una
+superficie; criteri di default e personalizzati si applicano a qualsiasi
+superficie.
+_Avoid_: input/output, categoria di rischio.
+
 **Teacher**:
 Il modello con licenza aperta che traduce, genera casi e scrive ragionamenti per
 il training. Le sue uscite sono candidate, non gold: entrano solo se coincidono
