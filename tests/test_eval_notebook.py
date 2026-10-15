@@ -50,6 +50,13 @@ def test_reports_declare_proof_type_weights_runtime_and_cite_dedup():
     assert "upload_folder" in source and "summary.json" in source
 
 
+def test_headline_prints_tri_state_and_binary_detection():
+    source = text()
+    assert '"accuracy": overall["accuracy"]' in source
+    assert '"binary": overall["binary"]' in source
+    assert '"unsupported": overall["unsupported"]' in source
+
+
 def test_refusals_are_recorded_never_silent():
     source = text()
     assert 'SUMMARY["skipped_models"][name] = str(error)' in source

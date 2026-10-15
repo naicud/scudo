@@ -35,6 +35,7 @@ AEGIS_FINE_GRAINED = (
     "Manipulation",
 )
 _TAIL = " Missing essential context means INSUFFICIENT."
+_QUESTION = "Does the text "
 
 
 @dataclass(frozen=True)
@@ -43,6 +44,18 @@ class DefaultCriterion:
     version: int
     text: str
     aegis_category: str | None = None  # None: criterio fuori dalla tassonomia Aegis
+
+    @property
+    def rule(self) -> str:
+        """Forma di regola per le baseline a policy (`scudo.policy_rules`).
+
+        La domanda «Does the text X?» diventa «The text must not X.»; il resto del
+        testo resta com'è, senza la coda INSUFFICIENT del nostro tri-state.
+        """
+        question, sep, rest = self.text.removesuffix(_TAIL).partition("?")
+        if not question.startswith(_QUESTION) or not sep:
+            raise ValueError(f"{self.id}: criterio non nella forma «{_QUESTION}…?»")
+        return f"The text must not {question.removeprefix(_QUESTION)}.{rest}"
 
 
 def _criterion(id_: str, category: str, text: str) -> DefaultCriterion:

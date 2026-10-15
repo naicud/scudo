@@ -12,6 +12,9 @@ confronta con il controllo sui soli casi comuni (`eval_report.shared_cases`):
 - sostituzione: guadagno di almeno 2 punti e intervallo bootstrap appaiato al 95%
   della differenza sopra lo zero.
 
+Per lettura, ogni lato riporta anche le metriche binarie (`binary`, VIOLATION contro
+il resto) sul totale e per benchmark: non entrano nella regola.
+
 Definizioni (`docs/eval.md`, *Bake-off*): la macro-F1 media le classi con gold nel
 gruppo; un errore conta come risposta sbagliata, mai NO_VIOLATION. Bootstrap:
 `RESAMPLES` ricampionamenti con `random.Random(SEED)`, stratificati per benchmark e
@@ -111,7 +114,11 @@ def _side(runs: Runs) -> dict:
     over_refusal = summary.get("over_refusal") or {}
     calibration = summary.get("calibration") or {}
     return {**primary(runs), "over_refusal": over_refusal.get("rate"),
-            "ece": calibration.get("ece"), "errors": sum(item.error is not None for item in flat)}
+            "ece": calibration.get("ece"), "errors": sum(item.error is not None for item in flat),
+            # Vista binaria (VIOLATION contro il resto), da leggere accanto al tri-state.
+            "binary": summary.get("binary"),
+            "binary_by_benchmark": {name: summarize(results).get("binary")
+                                    for name, results in sorted(runs.items())}}
 
 
 def _bootstrap(control: Runs, candidate: Runs, resamples: int, seed: int) -> list[float]:

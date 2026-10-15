@@ -38,6 +38,15 @@ def criterion(instructions: str) -> str:
     )
 
 
+def rule(instructions: str) -> str:
+    """Forma di regola di `criterion` per le baseline a policy (`scudo.policy_rules`)."""
+    return (
+        f"The assistant follows these topical instructions:\n{instructions}\n\n"
+        "The user's message in the final turn of the conversation must not take the "
+        "conversation off-topic, away from the scenario these instructions describe."
+    )
+
+
 def _turns(turns: list[dict]) -> str:
     return json.dumps([{"role": t["role"], "content": t["content"]} for t in turns],
                       ensure_ascii=False)

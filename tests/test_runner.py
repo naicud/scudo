@@ -3,6 +3,7 @@ from collections import defaultdict
 
 import pytest
 
+from scudo.aegis import HARMFUL_REQUEST
 from scudo.artifacts import ArtifactError
 from scudo.benchmarks import Loaded
 from scudo.cases import Case
@@ -74,8 +75,8 @@ class FakeBackend:
         return generated, steps
 
 
-def case(surface="prompt", verdict="VIOLATION", source_id="r1"):
-    return Case("org/bench", source_id, "en", surface, "Is it harmful?", "evidence", verdict)
+def case(surface="prompt", verdict="VIOLATION", source_id="r1", criterion="Is it harmful?"):
+    return Case("org/bench", source_id, "en", surface, criterion, "evidence", verdict)
 
 
 def loaded_of(*cases, machine=()):
@@ -219,7 +220,7 @@ def test_label_glued_to_another_token_is_an_error_not_a_fallback():
     tokenizer = FakeTokenizer(('"No', "Amb", " No", " Yes", " Amb"))
     backend = FakeBackend(generated_text='{"score": "No"}', tokenizer=tokenizer)
     scorer = scorer_for("granite-4.1-3b-policy-guardrails", tokenizer, backend)
-    [result] = run(loaded_of(case()), scorer)
+    [result] = run(loaded_of(case(criterion=HARMFUL_REQUEST)), scorer)
     assert result.error == "LABEL_TOKEN_NOT_FOUND"
 
 
@@ -229,10 +230,20 @@ def test_granite_policy_uses_the_card_generation_settings():
     step = len(tokenizer.encode('{"score": "'))
     backend = FakeBackend(generated_text='{"score": "No"}', tokenizer=tokenizer,
                           step_logits={step: {forms[""]["No"]: 4.0, forms[""]["Yes"]: 1.0}})
-    readout = scorer_for("granite-4.1-3b-policy-guardrails", tokenizer, backend)(case())
+    readout = scorer_for("granite-4.1-3b-policy-guardrails", tokenizer, backend)(
+        case(criterion=HARMFUL_REQUEST))
     assert readout.verdict == "VIOLATION"
     assert tokenizer.templates == [{"add_generation_prompt": True}]
     assert SPECS["granite-4.1-3b-policy-guardrails"].max_new_tokens == 20
+
+
+def test_granite_policy_criterion_without_rule_is_unsupported_and_never_generated():
+    tokenizer = FakeTokenizer(("Amb", " No", " Yes", " Amb"))
+    backend = FakeBackend(generated_text='{"score": "Yes"}', tokenizer=tokenizer)
+    [result] = run(loaded_of(case(verdict="NO_VIOLATION")),
+                   scorer_for("granite-4.1-3b-policy-guardrails", tokenizer, backend))
+    assert result.error == "UNSUPPORTED" and result.readout is None
+    assert backend.prompts == []
 
 
 def test_unsupported_surface_is_an_error_result():

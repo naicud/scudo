@@ -86,6 +86,16 @@ def test_identical_runs_have_zero_delta_and_do_not_replace_the_control():
     assert out["verdict"] == "NON SUPERA IL CONTROLLO"
 
 
+def test_comparison_also_reports_binary_detection_overall_and_per_benchmark():
+    out = compare(control_runs(), control_runs(), resamples=20, seed=1)
+    for side in ("control", "candidate"):
+        binary = out[side]["binary"]
+        assert binary["recall"] == pytest.approx(0.5)  # it/en-bench: metà dei V letti come N
+        assert binary["false_positive_rate"] == pytest.approx(20 / 300)  # i V su gold NV: xstest
+        assert set(out[side]["binary_by_benchmark"]) == set(control_runs())
+        assert out[side]["binary_by_benchmark"]["xstest"]["recall"] is None
+
+
 def test_clear_gain_with_ci_above_zero_replaces_the_control_pending_a_second_seed():
     better = control_runs()
     for name in ("it-bench", "en-bench"):

@@ -151,10 +151,12 @@ def headline(report):
     overall = report["overall"]
     calibration = overall["calibration"] or {}
     over_refusal = overall["over_refusal"] or {}
+    # Tri-state e vista binaria (VIOLATION contro il resto) affiancati: docs/eval.md.
     return {"cases": overall["cases"], "errors": overall["errors"],
+            "unsupported": overall["unsupported"],
             "accuracy": overall["accuracy"], "f1": overall["f1"],
             "ece": calibration.get("ece"), "brier": calibration.get("brier"),
-            "over_refusal_rate": over_refusal.get("rate")}
+            "over_refusal_rate": over_refusal.get("rate"), "binary": overall["binary"]}
 
 
 def evaluate(model, score, **header):
