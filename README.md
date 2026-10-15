@@ -71,11 +71,13 @@ L'import di `scudo` non carica torch, Unsloth o transformers.
 ## Checkpoint di training
 
 I checkpoint vanno in un repository Hugging Face privato. Va creato una volta,
-con un token di scrittura dell'account `naicud`:
+con un token di scrittura dell'account Hugging Face `Naicud`. La creazione
+richiede il namespace con la maiuscola; in lettura `naicud/...` risolve allo
+stesso repository:
 
 ```sh
 uvx --from huggingface_hub hf auth login
-uvx --from huggingface_hub hf repos create naicud/scudo-checkpoints --type model --private --exist-ok
+uvx --from huggingface_hub hf repos create Naicud/scudo-checkpoints --type model --private --exist-ok
 ```
 
 ## Licenza
