@@ -1,0 +1,1665 @@
+{
+ "runs": [
+  {
+   "scudo_sha": "c93eaef07335ec6a826c27d2da2f2642e120f0a5",
+   "model": "bakeoff-gemma4-e4b",
+   "proof_type": "local",
+   "format": "scudo.decision-token/1",
+   "harness": "scudo.eval_notebook",
+   "runtime": {
+    "name": "unsloth",
+    "version": "2026.10.6"
+   },
+   "weights": [
+    {
+     "repo": "google/gemma-4-E4B-it",
+     "revision": "ee0ef6023621cff504d758262d4e04895a5af4a2",
+     "filename": "model.safetensors",
+     "sha256": "cfbd3d2f1cd71bd471c37fe2bf8546d5028d41e5736f64e1ca6c6b8893125503"
+    },
+    {
+     "repo": "Naicud/scudo-bakeoff-gemma4-e4b",
+     "revision": "fa039d8cedcb3e0784adf64fa5a422a975b96428",
+     "filename": "adapter_model.safetensors",
+     "sha256": "9715f5ead034ad465f0028cf7d5f3331d75c92ce597b4926bae26ee54ca9ccee"
+    }
+   ],
+   "dedup": "NOT_RUN",
+   "on": "2026-10-15",
+   "benchmarks": {
+    "aegis2-test": {
+     "all": {
+      "cases": 500,
+      "errors": 0,
+      "unsupported": 0,
+      "accuracy": 0.854,
+      "binary_f1": 0.8645640074211504,
+      "false_positive_rate": 0.16379310344827586,
+      "abstention_no_violation": 0.0,
+      "ece": 0.047534536983983376
+     }
+    },
+    "aegis2-test/human-labels": {
+     "all": {
+      "cases": 412,
+      "errors": 0,
+      "unsupported": 0,
+      "accuracy": 0.8567961165048543,
+      "binary_f1": 0.854320987654321,
+      "false_positive_rate": 0.1743119266055046,
+      "abstention_no_violation": 0.0,
+      "ece": 0.049252813167265715
+     }
+    },
+    "canttalk-test": {
+     "all": {
+      "cases": 307,
+      "errors": 0,
+      "unsupported": 0,
+      "accuracy": 0.8534201954397395,
+      "binary_f1": 0.7692307692307692,
+      "false_positive_rate": 0.10096153846153846,
+      "abstention_no_violation": 0.0,
+      "ece": 0.06987553688045674
+     }
+    },
+    "jbb-behaviors": {
+     "all": {
+      "cases": 200,
+      "errors": 0,
+      "unsupported": 0,
+      "accuracy": 0.8,
+      "binary_f1": 0.8305084745762712,
+      "false_positive_rate": 0.38,
+      "abstention_no_violation": 0.0,
+      "ece": 0.0988276465187559
+     }
+    },
+    "nemotron3-test": {
+     "all": {
+      "cases": 500,
+      "errors": 0,
+      "unsupported": 0,
+      "accuracy": 0.864,
+      "binary_f1": 0.8650793650793651,
+      "false_positive_rate": 0.14741035856573706,
+      "abstention_no_violation": 0.0,
+      "ece": 0.019131006824357748
+     },
+     "en": {
+      "cases": 270,
+      "errors": 0,
+      "unsupported": 0,
+      "accuracy": 0.8629629629629629,
+      "binary_f1": 0.8701754385964913,
+      "false_positive_rate": 0.16153846153846155,
+      "abstention_no_violation": 0.0,
+      "ece": 0.023323889968573177
+     },
+     "it": {
+      "cases": 230,
+      "errors": 0,
+      "unsupported": 0,
+      "accuracy": 0.8652173913043478,
+      "binary_f1": 0.8584474885844747,
+      "false_positive_rate": 0.1322314049586777,
+      "abstention_no_violation": 0.0,
+      "ece": 0.027494226103170757
+     }
+    },
+    "nemotron3-test/human-labels": {
+     "all": {
+      "cases": 289,
+      "errors": 0,
+      "unsupported": 0,
+      "accuracy": 0.8408304498269896,
+      "binary_f1": 0.816,
+      "false_positive_rate": 0.15568862275449102,
+      "abstention_no_violation": 0.0,
+      "ece": 0.04596618894129481
+     },
+     "en": {
+      "cases": 141,
+      "errors": 0,
+      "unsupported": 0,
+      "accuracy": 0.8297872340425532,
+      "binary_f1": 0.7966101694915255,
+      "false_positive_rate": 0.17647058823529413,
+      "abstention_no_violation": 0.0,
+      "ece": 0.052464563231517596
+     },
+     "it": {
+      "cases": 148,
+      "errors": 0,
+      "unsupported": 0,
+      "accuracy": 0.8513513513513513,
+      "binary_f1": 0.8333333333333334,
+      "false_positive_rate": 0.13414634146341464,
+      "abstention_no_violation": 0.0,
+      "ece": 0.05349039051496886
+     }
+    },
+    "open-jev-heldout": {
+     "all": {
+      "cases": 500,
+      "errors": 0,
+      "unsupported": 0,
+      "accuracy": 0.476,
+      "binary_f1": 0.36097560975609755,
+      "false_positive_rate": 0.5816326530612245,
+      "abstention_no_violation": 0.0,
+      "ece": 0.2016347920152599
+     }
+    },
+    "orbench-hard": {
+     "all": {
+      "cases": 500,
+      "errors": 0,
+      "unsupported": 0,
+      "accuracy": 0.436,
+      "binary_f1": null,
+      "false_positive_rate": 0.564,
+      "abstention_no_violation": 0.0,
+      "ece": 0.31782322436562094
+     }
+    },
+    "toxicchat-test": {
+     "all": {
+      "cases": 500,
+      "errors": 0,
+      "unsupported": 0,
+      "accuracy": 0.918,
+      "binary_f1": 0.481012658227848,
+      "false_positive_rate": 0.0794979079497908,
+      "abstention_no_violation": 0.0,
+      "ece": 0.03121044846083342
+     }
+    },
+    "toxicchat-test/human-labels": {
+     "all": {
+      "cases": 264,
+      "errors": 0,
+      "unsupported": 0,
+      "accuracy": 0.8598484848484849,
+      "binary_f1": 0.5066666666666666,
+      "false_positive_rate": 0.14049586776859505,
+      "abstention_no_violation": 0.0,
+      "ece": 0.04041554696599026
+     }
+    },
+    "xstest-it": {
+     "all": {
+      "cases": 500,
+      "errors": 0,
+      "unsupported": 0,
+      "accuracy": 0.836,
+      "binary_f1": 0.8340080971659919,
+      "false_positive_rate": 0.2318840579710145,
+      "abstention_no_violation": 0.0,
+      "ece": 0.053542178629124186
+     },
+     "en": {
+      "cases": 258,
+      "errors": 0,
+      "unsupported": 0,
+      "accuracy": 0.8333333333333334,
+      "binary_f1": 0.8273092369477912,
+      "false_positive_rate": 0.2483221476510067,
+      "abstention_no_violation": 0.0,
+      "ece": 0.06497777348945413
+     },
+     "it": {
+      "cases": 242,
+      "errors": 0,
+      "unsupported": 0,
+      "accuracy": 0.8388429752066116,
+      "binary_f1": 0.8408163265306122,
+      "false_positive_rate": 0.2125984251968504,
+      "abstention_no_violation": 0.0,
+      "ece": 0.05369240411615564
+     }
+    },
+    "xstest": {
+     "all": {
+      "cases": 450,
+      "errors": 0,
+      "unsupported": 0,
+      "accuracy": 0.8488888888888889,
+      "binary_f1": 0.8461538461538461,
+      "false_positive_rate": 0.22,
+      "abstention_no_violation": 0.0,
+      "ece": 0.03702462425464351
+     }
+    }
+   }
+  },
+  {
+   "scudo_sha": "c93eaef07335ec6a826c27d2da2f2642e120f0a5",
+   "model": "bakeoff-ministral3-3b",
+   "proof_type": "local",
+   "format": "scudo.decision-token/1",
+   "harness": "scudo.eval_notebook",
+   "runtime": {
+    "name": "unsloth",
+    "version": "2026.10.6"
+   },
+   "weights": [
+    {
+     "repo": "mistralai/Ministral-3-3B-Base-2512",
+     "revision": "6f9c4b12a95b139af68670a6713616b757923735",
+     "filename": "model-00001-of-00002.safetensors",
+     "sha256": "0494c0a285767920a5e469af9710b499115667f84e17c225a956a5155459249f"
+    },
+    {
+     "repo": "mistralai/Ministral-3-3B-Base-2512",
+     "revision": "6f9c4b12a95b139af68670a6713616b757923735",
+     "filename": "model-00002-of-00002.safetensors",
+     "sha256": "3cd41d76f1d8e7b2fa64668d69177358dffdbd15231ccf6177798bca9de1a797"
+    },
+    {
+     "repo": "Naicud/scudo-bakeoff-ministral3-3b",
+     "revision": "d2c8d3bbadd87f50cfe9bd9b469481baf23a861e",
+     "filename": "adapter_model.safetensors",
+     "sha256": "0aa10cc76aa78b588ad0040a1c2aade5d00f9bd41a9c6bfccc120f76a7701096"
+    }
+   ],
+   "dedup": "NOT_RUN",
+   "on": "2026-10-15",
+   "benchmarks": {
+    "aegis2-test": {
+     "all": {
+      "cases": 500,
+      "errors": 0,
+      "unsupported": 0,
+      "accuracy": 0.83,
+      "binary_f1": 0.8423005565862708,
+      "false_positive_rate": 0.1896551724137931,
+      "abstention_no_violation": 0.0,
+      "ece": 0.048738017376868004
+     }
+    },
+    "aegis2-test/human-labels": {
+     "all": {
+      "cases": 412,
+      "errors": 0,
+      "unsupported": 0,
+      "accuracy": 0.8349514563106796,
+      "binary_f1": 0.8333333333333333,
+      "false_positive_rate": 0.2018348623853211,
+      "abstention_no_violation": 0.0,
+      "ece": 0.06401238834217415
+     }
+    },
+    "canttalk-test": {
+     "all": {
+      "cases": 307,
+      "errors": 0,
+      "unsupported": 0,
+      "accuracy": 0.6807817589576547,
+      "binary_f1": 0.03921568627450981,
+      "false_positive_rate": 0.004807692307692308,
+      "abstention_no_violation": 0.0,
+      "ece": 0.15196850284094693
+     }
+    },
+    "jbb-behaviors": {
+     "all": {
+      "cases": 200,
+      "errors": 0,
+      "unsupported": 0,
+      "accuracy": 0.745,
+      "binary_f1": 0.7866108786610878,
+      "false_positive_rate": 0.45,
+      "abstention_no_violation": 0.0,
+      "ece": 0.13290755944974372
+     }
+    },
+    "nemotron3-test": {
+     "all": {
+      "cases": 500,
+      "errors": 0,
+      "unsupported": 0,
+      "accuracy": 0.846,
+      "binary_f1": 0.8444444444444446,
+      "false_positive_rate": 0.14741035856573706,
+      "abstention_no_violation": 0.0,
+      "ece": 0.03485441060304493
+     },
+     "en": {
+      "cases": 270,
+      "errors": 0,
+      "unsupported": 0,
+      "accuracy": 0.8740740740740741,
+      "binary_f1": 0.8768115942028986,
+      "false_positive_rate": 0.11538461538461539,
+      "abstention_no_violation": 0.0,
+      "ece": 0.028620837102355103
+     },
+     "it": {
+      "cases": 230,
+      "errors": 0,
+      "unsupported": 0,
+      "accuracy": 0.8130434782608695,
+      "binary_f1": 0.8036529680365296,
+      "false_positive_rate": 0.18181818181818182,
+      "abstention_no_violation": 0.0,
+      "ece": 0.060869939674288394
+     }
+    },
+    "nemotron3-test/human-labels": {
+     "all": {
+      "cases": 289,
+      "errors": 0,
+      "unsupported": 0,
+      "accuracy": 0.8166089965397924,
+      "binary_f1": 0.790513833992095,
+      "false_positive_rate": 0.18562874251497005,
+      "abstention_no_violation": 0.0,
+      "ece": 0.051645413363768954
+     },
+     "en": {
+      "cases": 141,
+      "errors": 0,
+      "unsupported": 0,
+      "accuracy": 0.8439716312056738,
+      "binary_f1": 0.8103448275862069,
+      "false_positive_rate": 0.15294117647058825,
+      "abstention_no_violation": 0.0,
+      "ece": 0.04047938072870503
+     },
+     "it": {
+      "cases": 148,
+      "errors": 0,
+      "unsupported": 0,
+      "accuracy": 0.7905405405405406,
+      "binary_f1": 0.7737226277372262,
+      "false_positive_rate": 0.21951219512195122,
+      "abstention_no_violation": 0.0,
+      "ece": 0.0717767247862799
+     }
+    },
+    "open-jev-heldout": {
+     "all": {
+      "cases": 500,
+      "errors": 0,
+      "unsupported": 0,
+      "accuracy": 0.59,
+      "binary_f1": 0.3365695792880259,
+      "false_positive_rate": 0.38010204081632654,
+      "abstention_no_violation": 0.0,
+      "ece": 0.08313741278756469
+     }
+    },
+    "orbench-hard": {
+     "all": {
+      "cases": 500,
+      "errors": 0,
+      "unsupported": 0,
+      "accuracy": 0.356,
+      "binary_f1": null,
+      "false_positive_rate": 0.644,
+      "abstention_no_violation": 0.0,
+      "ece": 0.4273693393459744
+     }
+    },
+    "toxicchat-test": {
+     "all": {
+      "cases": 500,
+      "errors": 0,
+      "unsupported": 0,
+      "accuracy": 0.914,
+      "binary_f1": 0.46913580246913583,
+      "false_positive_rate": 0.08368200836820083,
+      "abstention_no_violation": 0.0,
+      "ece": 0.02775787441039231
+     }
+    },
+    "toxicchat-test/human-labels": {
+     "all": {
+      "cases": 264,
+      "errors": 0,
+      "unsupported": 0,
+      "accuracy": 0.8636363636363636,
+      "binary_f1": 0.5135135135135135,
+      "false_positive_rate": 0.13636363636363635,
+      "abstention_no_violation": 0.0,
+      "ece": 0.031126008898781633
+     }
+    },
+    "xstest-it": {
+     "all": {
+      "cases": 500,
+      "errors": 0,
+      "unsupported": 0,
+      "accuracy": 0.748,
+      "binary_f1": 0.7622641509433962,
+      "false_positive_rate": 0.37681159420289856,
+      "abstention_no_violation": 0.0,
+      "ece": 0.12168952012007783
+     },
+     "en": {
+      "cases": 258,
+      "errors": 0,
+      "unsupported": 0,
+      "accuracy": 0.7674418604651163,
+      "binary_f1": 0.7709923664122138,
+      "false_positive_rate": 0.348993288590604,
+      "abstention_no_violation": 0.0,
+      "ece": 0.11923728121602661
+     },
+     "it": {
+      "cases": 242,
+      "errors": 0,
+      "unsupported": 0,
+      "accuracy": 0.7272727272727273,
+      "binary_f1": 0.7537313432835819,
+      "false_positive_rate": 0.4094488188976378,
+      "abstention_no_violation": 0.0,
+      "ece": 0.1287298297057899
+     }
+    },
+    "xstest": {
+     "all": {
+      "cases": 450,
+      "errors": 0,
+      "unsupported": 0,
+      "accuracy": 0.7644444444444445,
+      "binary_f1": 0.7744680851063829,
+      "false_positive_rate": 0.352,
+      "abstention_no_violation": 0.0,
+      "ece": 0.10258247238069132
+     }
+    }
+   }
+  },
+  {
+   "scudo_sha": "c93eaef07335ec6a826c27d2da2f2642e120f0a5",
+   "model": "bakeoff-qwen35-4b",
+   "proof_type": "local",
+   "format": "scudo.decision-token/1",
+   "harness": "scudo.eval_notebook",
+   "runtime": {
+    "name": "unsloth",
+    "version": "2026.10.6"
+   },
+   "weights": [
+    {
+     "repo": "Qwen/Qwen3.5-4B",
+     "revision": "851bf6e806efd8d0a36b00ddf55e13ccb7b8cd0a",
+     "filename": "model.safetensors-00001-of-00002.safetensors",
+     "sha256": "26a93f066e1916adb13453dae5a0c707c0fbc71299ed98779571a907b8e74c61"
+    },
+    {
+     "repo": "Qwen/Qwen3.5-4B",
+     "revision": "851bf6e806efd8d0a36b00ddf55e13ccb7b8cd0a",
+     "filename": "model.safetensors-00002-of-00002.safetensors",
+     "sha256": "cb544bd9bfae93dc59b0f22b292f5933573854a7f9b97835c67060d7d910e188"
+    },
+    {
+     "repo": "Naicud/scudo-bakeoff-qwen35-4b",
+     "revision": "f4f5a84c06bcb7d121dff9e0823d0478fb6219da",
+     "filename": "adapter_model.safetensors",
+     "sha256": "e3fa8724d824292f1236c6c986c3a6b4c76e13cb30c78fb7721e66d3ba0f50c8"
+    }
+   ],
+   "dedup": "NOT_RUN",
+   "on": "2026-10-15",
+   "benchmarks": {
+    "aegis2-test": {
+     "all": {
+      "cases": 500,
+      "errors": 0,
+      "unsupported": 0,
+      "accuracy": 0.83,
+      "binary_f1": 0.8387096774193549,
+      "false_positive_rate": 0.16379310344827586,
+      "abstention_no_violation": 0.0,
+      "ece": 0.051196294976940705
+     }
+    },
+    "aegis2-test/human-labels": {
+     "all": {
+      "cases": 412,
+      "errors": 0,
+      "unsupported": 0,
+      "accuracy": 0.837378640776699,
+      "binary_f1": 0.8312342569269521,
+      "false_positive_rate": 0.1743119266055046,
+      "abstention_no_violation": 0.0,
+      "ece": 0.05318119109420942
+     }
+    },
+    "canttalk-test": {
+     "all": {
+      "cases": 307,
+      "errors": 0,
+      "unsupported": 0,
+      "accuracy": 0.6807817589576547,
+      "binary_f1": 0.4024390243902439,
+      "false_positive_rate": 0.15384615384615385,
+      "abstention_no_violation": 0.0,
+      "ece": 0.0852105459206206
+     }
+    },
+    "jbb-behaviors": {
+     "all": {
+      "cases": 200,
+      "errors": 0,
+      "unsupported": 0,
+      "accuracy": 0.8,
+      "binary_f1": 0.8260869565217392,
+      "false_positive_rate": 0.35,
+      "abstention_no_violation": 0.0,
+      "ece": 0.10349553155896297
+     }
+    },
+    "nemotron3-test": {
+     "all": {
+      "cases": 500,
+      "errors": 0,
+      "unsupported": 0,
+      "accuracy": 0.86,
+      "binary_f1": 0.8588709677419355,
+      "false_positive_rate": 0.13545816733067728,
+      "abstention_no_violation": 0.0,
+      "ece": 0.02862592188330987
+     },
+     "en": {
+      "cases": 270,
+      "errors": 0,
+      "unsupported": 0,
+      "accuracy": 0.8777777777777778,
+      "binary_f1": 0.8808664259927799,
+      "false_positive_rate": 0.11538461538461539,
+      "abstention_no_violation": 0.0,
+      "ece": 0.02540158548593869
+     },
+     "it": {
+      "cases": 230,
+      "errors": 0,
+      "unsupported": 0,
+      "accuracy": 0.8391304347826087,
+      "binary_f1": 0.8310502283105023,
+      "false_positive_rate": 0.15702479338842976,
+      "abstention_no_violation": 0.0,
+      "ece": 0.0417662698862293
+     }
+    },
+    "nemotron3-test/human-labels": {
+     "all": {
+      "cases": 289,
+      "errors": 0,
+      "unsupported": 0,
+      "accuracy": 0.8373702422145328,
+      "binary_f1": 0.8016877637130801,
+      "false_positive_rate": 0.11976047904191617,
+      "abstention_no_violation": 0.0,
+      "ece": 0.04485474447510311
+     },
+     "en": {
+      "cases": 141,
+      "errors": 0,
+      "unsupported": 0,
+      "accuracy": 0.8581560283687943,
+      "binary_f1": 0.8148148148148148,
+      "false_positive_rate": 0.09411764705882353,
+      "abstention_no_violation": 0.0,
+      "ece": 0.034514133680932924
+     },
+     "it": {
+      "cases": 148,
+      "errors": 0,
+      "unsupported": 0,
+      "accuracy": 0.8175675675675675,
+      "binary_f1": 0.7906976744186046,
+      "false_positive_rate": 0.14634146341463414,
+      "abstention_no_violation": 0.0,
+      "ece": 0.06284216700709355
+     }
+    },
+    "open-jev-heldout": {
+     "all": {
+      "cases": 500,
+      "errors": 0,
+      "unsupported": 0,
+      "accuracy": 0.646,
+      "binary_f1": 0.375886524822695,
+      "false_positive_rate": 0.3086734693877551,
+      "abstention_no_violation": 0.002551020408163265,
+      "ece": 0.09152775181686937
+     }
+    },
+    "orbench-hard": {
+     "all": {
+      "cases": 500,
+      "errors": 0,
+      "unsupported": 0,
+      "accuracy": 0.432,
+      "binary_f1": null,
+      "false_positive_rate": 0.568,
+      "abstention_no_violation": 0.0,
+      "ece": 0.2947345624867209
+     }
+    },
+    "toxicchat-test": {
+     "all": {
+      "cases": 500,
+      "errors": 0,
+      "unsupported": 0,
+      "accuracy": 0.918,
+      "binary_f1": 0.4675324675324675,
+      "false_positive_rate": 0.07740585774058577,
+      "abstention_no_violation": 0.0,
+      "ece": 0.033795860720007675
+     }
+    },
+    "toxicchat-test/human-labels": {
+     "all": {
+      "cases": 264,
+      "errors": 0,
+      "unsupported": 0,
+      "accuracy": 0.8636363636363636,
+      "binary_f1": 0.5,
+      "false_positive_rate": 0.1322314049586777,
+      "abstention_no_violation": 0.0,
+      "ece": 0.04601530234674795
+     }
+    },
+    "xstest-it": {
+     "all": {
+      "cases": 500,
+      "errors": 0,
+      "unsupported": 0,
+      "accuracy": 0.812,
+      "binary_f1": 0.8127490039840638,
+      "false_positive_rate": 0.26811594202898553,
+      "abstention_no_violation": 0.0,
+      "ece": 0.05479205352469597
+     },
+     "en": {
+      "cases": 258,
+      "errors": 0,
+      "unsupported": 0,
+      "accuracy": 0.8333333333333334,
+      "binary_f1": 0.8273092369477912,
+      "false_positive_rate": 0.2483221476510067,
+      "abstention_no_violation": 0.0,
+      "ece": 0.04590298500491448
+     },
+     "it": {
+      "cases": 242,
+      "errors": 0,
+      "unsupported": 0,
+      "accuracy": 0.7892561983471075,
+      "binary_f1": 0.7984189723320159,
+      "false_positive_rate": 0.29133858267716534,
+      "abstention_no_violation": 0.0,
+      "ece": 0.06772741279678943
+     }
+    },
+    "xstest": {
+     "all": {
+      "cases": 450,
+      "errors": 0,
+      "unsupported": 0,
+      "accuracy": 0.86,
+      "binary_f1": 0.8571428571428571,
+      "false_positive_rate": 0.208,
+      "abstention_no_violation": 0.0,
+      "ece": 0.05065943261087171
+     }
+    }
+   }
+  },
+  {
+   "scudo_sha": "c93eaef07335ec6a826c27d2da2f2642e120f0a5",
+   "model": "granite-4.1-3b-policy-guardrails",
+   "proof_type": "reference",
+   "format": "granitelib-guardian-r1.0/policy-guardrails@1a1a488+scudo.policy-rules/1",
+   "harness": "scudo.eval_notebook",
+   "runtime": {
+    "name": "transformers",
+    "version": "5.17.0"
+   },
+   "weights": [
+    {
+     "repo": "ibm-granite/granite-4.1-3b",
+     "revision": "c0650403e44e78ec0262dab1c90914c65b196c4e",
+     "filename": "model-00001-of-00002.safetensors",
+     "sha256": "895bf5f2d7c8b06ca902499567d3c3d9ed30061e4c5ad94bf8216286ca67e2fd"
+    },
+    {
+     "repo": "ibm-granite/granite-4.1-3b",
+     "revision": "c0650403e44e78ec0262dab1c90914c65b196c4e",
+     "filename": "model-00002-of-00002.safetensors",
+     "sha256": "de8c9efdaa6f669d595bda8b949213cba92ea69689fd2a27fbceed3d1ebeb2f7"
+    },
+    {
+     "repo": "ibm-granite/granitelib-guardian-r1.0",
+     "revision": "1a1a488a51d0d5307e30e5b3c1e66b4a5237d18a",
+     "filename": "adapter_model.safetensors",
+     "sha256": "a8bc1bd5119bee0eba1d3ac033f886554b16327e5ab5f8c1197c1b8892154ac1"
+    }
+   ],
+   "dedup": "NOT_RUN",
+   "on": "2026-10-15",
+   "benchmarks": {
+    "aegis2-test": {
+     "all": {
+      "cases": 500,
+      "errors": 18,
+      "unsupported": 0,
+      "accuracy": 0.46,
+      "binary_f1": 0.7292110874200426,
+      "false_positive_rate": 0.13452914798206278,
+      "abstention_no_violation": 0.600896860986547,
+      "ece": 0.32424357005398313
+     }
+    },
+    "aegis2-test/human-labels": {
+     "all": {
+      "cases": 412,
+      "errors": 18,
+      "unsupported": 0,
+      "accuracy": 0.45145631067961167,
+      "binary_f1": 0.7471910112359551,
+      "false_positive_rate": 0.13875598086124402,
+      "abstention_no_violation": 0.6076555023923444,
+      "ece": 0.35420098451230436
+     }
+    },
+    "canttalk-test": {
+     "all": {
+      "cases": 307,
+      "errors": 0,
+      "unsupported": 0,
+      "accuracy": 0.495114006514658,
+      "binary_f1": null,
+      "false_positive_rate": 0.0,
+      "abstention_no_violation": 0.2692307692307692,
+      "ece": 0.28682294471225267
+     }
+    },
+    "jbb-behaviors": {
+     "all": {
+      "cases": 200,
+      "errors": 6,
+      "unsupported": 0,
+      "accuracy": 0.535,
+      "binary_f1": 0.8279069767441859,
+      "false_positive_rate": 0.2653061224489796,
+      "abstention_no_violation": 0.5510204081632653,
+      "ece": 0.2829755139296082
+     }
+    },
+    "nemotron3-test": {
+     "all": {
+      "cases": 500,
+      "errors": 8,
+      "unsupported": 0,
+      "accuracy": 0.504,
+      "binary_f1": 0.7268408551068885,
+      "false_positive_rate": 0.07630522088353414,
+      "abstention_no_violation": 0.5261044176706827,
+      "ece": 0.2818775122964076
+     },
+     "en": {
+      "cases": 270,
+      "errors": 6,
+      "unsupported": 0,
+      "accuracy": 0.5222222222222223,
+      "binary_f1": 0.7622950819672131,
+      "false_positive_rate": 0.08527131782945736,
+      "abstention_no_violation": 0.5426356589147286,
+      "ece": 0.2832648495601274
+     },
+     "it": {
+      "cases": 230,
+      "errors": 2,
+      "unsupported": 0,
+      "accuracy": 0.4826086956521739,
+      "binary_f1": 0.6779661016949153,
+      "false_positive_rate": 0.06666666666666667,
+      "abstention_no_violation": 0.5083333333333333,
+      "ece": 0.3087394811321184
+     }
+    },
+    "nemotron3-test/human-labels": {
+     "all": {
+      "cases": 289,
+      "errors": 3,
+      "unsupported": 0,
+      "accuracy": 0.4013840830449827,
+      "binary_f1": 0.6666666666666665,
+      "false_positive_rate": 0.08433734939759036,
+      "abstention_no_violation": 0.6265060240963856,
+      "ece": 0.4179050097920824
+     },
+     "en": {
+      "cases": 141,
+      "errors": 3,
+      "unsupported": 0,
+      "accuracy": 0.3829787234042553,
+      "binary_f1": 0.6930693069306931,
+      "false_positive_rate": 0.11904761904761904,
+      "abstention_no_violation": 0.6547619047619048,
+      "ece": 0.44444696700133696
+     },
+     "it": {
+      "cases": 148,
+      "errors": 0,
+      "unsupported": 0,
+      "accuracy": 0.4189189189189189,
+      "binary_f1": 0.6407766990291263,
+      "false_positive_rate": 0.04878048780487805,
+      "abstention_no_violation": 0.5975609756097561,
+      "ece": 0.3966166135140017
+     }
+    },
+    "orbench-hard": {
+     "all": {
+      "cases": 500,
+      "errors": 11,
+      "unsupported": 0,
+      "accuracy": 0.068,
+      "binary_f1": null,
+      "false_positive_rate": 0.41922290388548056,
+      "abstention_no_violation": 0.5112474437627812,
+      "ece": 0.642442653471825
+     }
+    },
+    "toxicchat-test": {
+     "all": {
+      "cases": 500,
+      "errors": 8,
+      "unsupported": 0,
+      "accuracy": 0.374,
+      "binary_f1": 0.3809523809523809,
+      "false_positive_rate": 0.06170212765957447,
+      "abstention_no_violation": 0.5659574468085107,
+      "ece": 0.34735622329851695
+     }
+    },
+    "toxicchat-test/human-labels": {
+     "all": {
+      "cases": 264,
+      "errors": 6,
+      "unsupported": 0,
+      "accuracy": 0.3143939393939394,
+      "binary_f1": 0.4067796610169491,
+      "false_positive_rate": 0.1059322033898305,
+      "abstention_no_violation": 0.5932203389830508,
+      "ece": 0.4022088302155096
+     }
+    },
+    "xstest-it": {
+     "all": {
+      "cases": 500,
+      "errors": 34,
+      "unsupported": 0,
+      "accuracy": 0.444,
+      "binary_f1": 0.7668161434977578,
+      "false_positive_rate": 0.19101123595505617,
+      "abstention_no_violation": 0.6179775280898876,
+      "ece": 0.3294195457583774
+     },
+     "en": {
+      "cases": 258,
+      "errors": 30,
+      "unsupported": 0,
+      "accuracy": 0.42248062015503873,
+      "binary_f1": 0.7207207207207207,
+      "false_positive_rate": 0.2357142857142857,
+      "abstention_no_violation": 0.5571428571428572,
+      "ece": 0.3304218712811783
+     },
+     "it": {
+      "cases": 242,
+      "errors": 4,
+      "unsupported": 0,
+      "accuracy": 0.4669421487603306,
+      "binary_f1": 0.8125,
+      "false_positive_rate": 0.14173228346456693,
+      "abstention_no_violation": 0.6850393700787402,
+      "ece": 0.3284593347533413
+     }
+    },
+    "xstest": {
+     "all": {
+      "cases": 450,
+      "errors": 53,
+      "unsupported": 0,
+      "accuracy": 0.44222222222222224,
+      "binary_f1": 0.7455919395465995,
+      "false_positive_rate": 0.21120689655172414,
+      "abstention_no_violation": 0.5689655172413793,
+      "ece": 0.31065836323622215
+     }
+    }
+   }
+  },
+  {
+   "scudo_sha": "c93eaef07335ec6a826c27d2da2f2642e120f0a5",
+   "model": "granite-guardian-4.1-8b",
+   "proof_type": "reference",
+   "format": "granite-guardian-4.1/byoc-no-think",
+   "harness": "scudo.eval_notebook",
+   "runtime": {
+    "name": "transformers",
+    "version": "5.17.0"
+   },
+   "weights": [
+    {
+     "repo": "ibm-granite/granite-guardian-4.1-8b",
+     "revision": "ab01ccca5dcfb80246369a086a4a87a29198f5af",
+     "filename": "model-00001-of-00004.safetensors",
+     "sha256": "3e86d76012837843bca528e55eba3e6d9d272ec2b7f0125a101eda2d4c426913"
+    },
+    {
+     "repo": "ibm-granite/granite-guardian-4.1-8b",
+     "revision": "ab01ccca5dcfb80246369a086a4a87a29198f5af",
+     "filename": "model-00002-of-00004.safetensors",
+     "sha256": "d767e1fdc433da8cc6004480494d247a051c92e42dfed0d5d16a4aa1eb6e4e4d"
+    },
+    {
+     "repo": "ibm-granite/granite-guardian-4.1-8b",
+     "revision": "ab01ccca5dcfb80246369a086a4a87a29198f5af",
+     "filename": "model-00003-of-00004.safetensors",
+     "sha256": "5e38424223c61de3338fcc75fdee43e7b935b613e9605d952d1a87c3ce9c6212"
+    },
+    {
+     "repo": "ibm-granite/granite-guardian-4.1-8b",
+     "revision": "ab01ccca5dcfb80246369a086a4a87a29198f5af",
+     "filename": "model-00004-of-00004.safetensors",
+     "sha256": "36510c58b890dfa132426bf6d47e72d5ac2c759c9c8e7526db8183c08108582d"
+    }
+   ],
+   "dedup": "NOT_RUN",
+   "on": "2026-10-15",
+   "benchmarks": {
+    "aegis2-test": {
+     "all": {
+      "cases": 500,
+      "errors": 2,
+      "unsupported": 0,
+      "accuracy": 0.824,
+      "binary_f1": 0.8297455968688846,
+      "false_positive_rate": 0.1341991341991342,
+      "abstention_no_violation": 0.0,
+      "ece": 0.14289250685583763
+     }
+    },
+    "aegis2-test/human-labels": {
+     "all": {
+      "cases": 412,
+      "errors": 2,
+      "unsupported": 0,
+      "accuracy": 0.8592233009708737,
+      "binary_f1": 0.8542199488491048,
+      "false_positive_rate": 0.1382488479262673,
+      "abstention_no_violation": 0.0,
+      "ece": 0.11527148482661984
+     }
+    },
+    "canttalk-test": {
+     "all": {
+      "cases": 307,
+      "errors": 0,
+      "unsupported": 0,
+      "accuracy": 0.8013029315960912,
+      "binary_f1": 0.5547445255474452,
+      "false_positive_rate": 0.0,
+      "abstention_no_violation": 0.0,
+      "ece": 0.1707947039486874
+     }
+    },
+    "jbb-behaviors": {
+     "all": {
+      "cases": 200,
+      "errors": 1,
+      "unsupported": 0,
+      "accuracy": 0.825,
+      "binary_f1": 0.8468468468468469,
+      "false_positive_rate": 0.2828282828282828,
+      "abstention_no_violation": 0.0,
+      "ece": 0.1404571237303456
+     }
+    },
+    "nemotron3-test": {
+     "all": {
+      "cases": 500,
+      "errors": 3,
+      "unsupported": 0,
+      "accuracy": 0.85,
+      "binary_f1": 0.840958605664488,
+      "false_positive_rate": 0.06827309236947791,
+      "abstention_no_violation": 0.0,
+      "ece": 0.11934105133830869
+     },
+     "en": {
+      "cases": 270,
+      "errors": 2,
+      "unsupported": 0,
+      "accuracy": 0.8814814814814815,
+      "binary_f1": 0.8812260536398469,
+      "false_positive_rate": 0.046511627906976744,
+      "abstention_no_violation": 0.0,
+      "ece": 0.0951538038856535
+     },
+     "it": {
+      "cases": 230,
+      "errors": 1,
+      "unsupported": 0,
+      "accuracy": 0.8130434782608695,
+      "binary_f1": 0.7878787878787878,
+      "false_positive_rate": 0.09166666666666666,
+      "abstention_no_violation": 0.0,
+      "ece": 0.15259077235125276
+     }
+    },
+    "nemotron3-test/human-labels": {
+     "all": {
+      "cases": 289,
+      "errors": 3,
+      "unsupported": 0,
+      "accuracy": 0.8408304498269896,
+      "binary_f1": 0.8053097345132743,
+      "false_positive_rate": 0.07878787878787878,
+      "abstention_no_violation": 0.0,
+      "ece": 0.13112686009317018
+     },
+     "en": {
+      "cases": 141,
+      "errors": 2,
+      "unsupported": 0,
+      "accuracy": 0.8794326241134752,
+      "binary_f1": 0.8490566037735849,
+      "false_positive_rate": 0.05952380952380952,
+      "abstention_no_violation": 0.0,
+      "ece": 0.10714586092478064
+     },
+     "it": {
+      "cases": 148,
+      "errors": 1,
+      "unsupported": 0,
+      "accuracy": 0.8040540540540541,
+      "binary_f1": 0.7666666666666667,
+      "false_positive_rate": 0.09876543209876543,
+      "abstention_no_violation": 0.0,
+      "ece": 0.16726476949728353
+     }
+    },
+    "open-jev-heldout": {
+     "all": {
+      "cases": 500,
+      "errors": 6,
+      "unsupported": 0,
+      "accuracy": 0.758,
+      "binary_f1": 0.4507042253521127,
+      "false_positive_rate": 0.14690721649484537,
+      "abstention_no_violation": 0.0,
+      "ece": 0.03331493640089745
+     }
+    },
+    "orbench-hard": {
+     "all": {
+      "cases": 500,
+      "errors": 2,
+      "unsupported": 0,
+      "accuracy": 0.338,
+      "binary_f1": null,
+      "false_positive_rate": 0.6606425702811245,
+      "abstention_no_violation": 0.0,
+      "ece": 0.5678403393786001
+     }
+    },
+    "toxicchat-test": {
+     "all": {
+      "cases": 500,
+      "errors": 1,
+      "unsupported": 0,
+      "accuracy": 0.952,
+      "binary_f1": 0.6101694915254238,
+      "false_positive_rate": 0.039832285115303984,
+      "abstention_no_violation": 0.0,
+      "ece": 0.03323355517051891
+     }
+    },
+    "toxicchat-test/human-labels": {
+     "all": {
+      "cases": 264,
+      "errors": 1,
+      "unsupported": 0,
+      "accuracy": 0.9204545454545454,
+      "binary_f1": 0.6428571428571428,
+      "false_positive_rate": 0.06639004149377593,
+      "abstention_no_violation": 0.0,
+      "ece": 0.05563372654208439
+     }
+    },
+    "xstest-it": {
+     "all": {
+      "cases": 500,
+      "errors": 1,
+      "unsupported": 0,
+      "accuracy": 0.886,
+      "binary_f1": 0.8803418803418803,
+      "false_positive_rate": 0.13818181818181818,
+      "abstention_no_violation": 0.0,
+      "ece": 0.08404609129785649
+     },
+     "en": {
+      "cases": 258,
+      "errors": 0,
+      "unsupported": 0,
+      "accuracy": 0.8875968992248062,
+      "binary_f1": 0.876595744680851,
+      "false_positive_rate": 0.15436241610738255,
+      "abstention_no_violation": 0.0,
+      "ece": 0.09352270904387738
+     },
+     "it": {
+      "cases": 242,
+      "errors": 1,
+      "unsupported": 0,
+      "accuracy": 0.8842975206611571,
+      "binary_f1": 0.8841201716738197,
+      "false_positive_rate": 0.11904761904761904,
+      "abstention_no_violation": 0.0,
+      "ece": 0.08665326060096885
+     }
+    },
+    "xstest": {
+     "all": {
+      "cases": 450,
+      "errors": 0,
+      "unsupported": 0,
+      "accuracy": 0.9044444444444445,
+      "binary_f1": 0.8978622327790974,
+      "false_positive_rate": 0.128,
+      "abstention_no_violation": 0.0,
+      "ece": 0.0709480461369832
+     }
+    }
+   }
+  },
+  {
+   "scudo_sha": "c93eaef07335ec6a826c27d2da2f2642e120f0a5",
+   "model": "qwen3guard-gen-4b",
+   "proof_type": "reference",
+   "format": "qwen3guard-gen/chat-template@6ec4282",
+   "harness": "scudo.eval_notebook",
+   "runtime": {
+    "name": "transformers",
+    "version": "5.17.0"
+   },
+   "weights": [
+    {
+     "repo": "Qwen/Qwen3Guard-Gen-4B",
+     "revision": "6ec42827da0c1ff11e7a49dc269d2e810d27e108",
+     "filename": "model-00001-of-00003.safetensors",
+     "sha256": "d73f9558059de0740f2cf77bd98705dab0073fc3b61f41460124252df60a717e"
+    },
+    {
+     "repo": "Qwen/Qwen3Guard-Gen-4B",
+     "revision": "6ec42827da0c1ff11e7a49dc269d2e810d27e108",
+     "filename": "model-00002-of-00003.safetensors",
+     "sha256": "13f603d405366e68d19698e90a934eae216f9e9182e5b71c236b0043cb4f8b59"
+    },
+    {
+     "repo": "Qwen/Qwen3Guard-Gen-4B",
+     "revision": "6ec42827da0c1ff11e7a49dc269d2e810d27e108",
+     "filename": "model-00003-of-00003.safetensors",
+     "sha256": "e12365059f1dade58ce0df2d22f9d8618eaf60e15b01b2fcceee55b6ac5a8832"
+    }
+   ],
+   "dedup": "NOT_RUN",
+   "on": "2026-10-15",
+   "benchmarks": {
+    "aegis2-test": {
+     "all": {
+      "cases": 347,
+      "errors": 4,
+      "unsupported": 153,
+      "accuracy": 0.7348703170028819,
+      "binary_f1": 0.847457627118644,
+      "false_positive_rate": 0.06622516556291391,
+      "abstention_no_violation": 0.23841059602649006,
+      "ece": 0.1714538445849258
+     }
+    },
+    "aegis2-test/human-labels": {
+     "all": {
+      "cases": 347,
+      "errors": 4,
+      "unsupported": 65,
+      "accuracy": 0.7348703170028819,
+      "binary_f1": 0.847457627118644,
+      "false_positive_rate": 0.06622516556291391,
+      "abstention_no_violation": 0.23841059602649006,
+      "ece": 0.1714538445849258
+     }
+    },
+    "canttalk-test": {
+     "all": {
+      "cases": 307,
+      "errors": 1,
+      "unsupported": 0,
+      "accuracy": 0.6644951140065146,
+      "binary_f1": null,
+      "false_positive_rate": 0.0,
+      "abstention_no_violation": 0.014492753623188406,
+      "ece": 0.2948375176763922
+     }
+    },
+    "jbb-behaviors": {
+     "all": {
+      "cases": 200,
+      "errors": 4,
+      "unsupported": 0,
+      "accuracy": 0.665,
+      "binary_f1": 0.8727272727272728,
+      "false_positive_rate": 0.25,
+      "abstention_no_violation": 0.3645833333333333,
+      "ece": 0.19661457840557925
+     }
+    },
+    "nemotron3-test": {
+     "all": {
+      "cases": 357,
+      "errors": 2,
+      "unsupported": 143,
+      "accuracy": 0.7338935574229691,
+      "binary_f1": 0.8126801152737751,
+      "false_positive_rate": 0.0625,
+      "abstention_no_violation": 0.18125,
+      "ece": 0.15471817747587668
+     },
+     "en": {
+      "cases": 188,
+      "errors": 0,
+      "unsupported": 82,
+      "accuracy": 0.7712765957446809,
+      "binary_f1": 0.8494623655913979,
+      "false_positive_rate": 0.024096385542168676,
+      "abstention_no_violation": 0.18072289156626506,
+      "ece": 0.12444483347581771
+     },
+     "it": {
+      "cases": 169,
+      "errors": 2,
+      "unsupported": 61,
+      "accuracy": 0.6923076923076923,
+      "binary_f1": 0.7701863354037267,
+      "false_positive_rate": 0.1038961038961039,
+      "abstention_no_violation": 0.18181818181818182,
+      "ece": 0.1887983491645658
+     }
+    },
+    "nemotron3-test/human-labels": {
+     "all": {
+      "cases": 238,
+      "errors": 2,
+      "unsupported": 51,
+      "accuracy": 0.6932773109243697,
+      "binary_f1": 0.7536231884057971,
+      "false_positive_rate": 0.06086956521739131,
+      "abstention_no_violation": 0.1826086956521739,
+      "ece": 0.20162378780433962
+     },
+     "en": {
+      "cases": 112,
+      "errors": 0,
+      "unsupported": 29,
+      "accuracy": 0.75,
+      "binary_f1": 0.8041237113402062,
+      "false_positive_rate": 0.03571428571428571,
+      "abstention_no_violation": 0.16071428571428573,
+      "ece": 0.1612858110155224
+     },
+     "it": {
+      "cases": 126,
+      "errors": 2,
+      "unsupported": 22,
+      "accuracy": 0.6428571428571429,
+      "binary_f1": 0.7090909090909092,
+      "false_positive_rate": 0.0847457627118644,
+      "abstention_no_violation": 0.2033898305084746,
+      "ece": 0.23805808942004553
+     }
+    },
+    "open-jev-heldout": {
+     "all": {
+      "cases": 500,
+      "errors": 1,
+      "unsupported": 0,
+      "accuracy": 0.782,
+      "binary_f1": null,
+      "false_positive_rate": 0.0,
+      "abstention_no_violation": 0.0,
+      "ece": 0.20687507757316564
+     }
+    },
+    "orbench-hard": {
+     "all": {
+      "cases": 500,
+      "errors": 12,
+      "unsupported": 0,
+      "accuracy": 0.178,
+      "binary_f1": null,
+      "false_positive_rate": 0.4180327868852459,
+      "abstention_no_violation": 0.39959016393442626,
+      "ece": 0.5629569603409357
+     }
+    },
+    "toxicchat-test": {
+     "all": {
+      "cases": 500,
+      "errors": 0,
+      "unsupported": 0,
+      "accuracy": 0.898,
+      "binary_f1": 0.679245283018868,
+      "false_positive_rate": 0.027196652719665274,
+      "abstention_no_violation": 0.07112970711297072,
+      "ece": 0.041436546673632946
+     }
+    },
+    "toxicchat-test/human-labels": {
+     "all": {
+      "cases": 264,
+      "errors": 0,
+      "unsupported": 0,
+      "accuracy": 0.8409090909090909,
+      "binary_f1": 0.6923076923076923,
+      "false_positive_rate": 0.049586776859504134,
+      "abstention_no_violation": 0.10743801652892562,
+      "ece": 0.08177418252778075
+     }
+    },
+    "xstest-it": {
+     "all": {
+      "cases": 500,
+      "errors": 2,
+      "unsupported": 0,
+      "accuracy": 0.82,
+      "binary_f1": 0.864321608040201,
+      "false_positive_rate": 0.0072992700729927005,
+      "abstention_no_violation": 0.12408759124087591,
+      "ece": 0.0882656264257
+     },
+     "en": {
+      "cases": 258,
+      "errors": 1,
+      "unsupported": 0,
+      "accuracy": 0.810077519379845,
+      "binary_f1": 0.865979381443299,
+      "false_positive_rate": 0.006756756756756757,
+      "abstention_no_violation": 0.14864864864864866,
+      "ece": 0.10758300951784447
+     },
+     "it": {
+      "cases": 242,
+      "errors": 1,
+      "unsupported": 0,
+      "accuracy": 0.8305785123966942,
+      "binary_f1": 0.8627450980392156,
+      "false_positive_rate": 0.007936507936507936,
+      "abstention_no_violation": 0.09523809523809523,
+      "ece": 0.07015346447398917
+     }
+    },
+    "xstest": {
+     "all": {
+      "cases": 450,
+      "errors": 1,
+      "unsupported": 0,
+      "accuracy": 0.8266666666666667,
+      "binary_f1": 0.8777777777777778,
+      "false_positive_rate": 0.008032128514056224,
+      "abstention_no_violation": 0.13253012048192772,
+      "ece": 0.09218101683716945
+     }
+    }
+   }
+  },
+  {
+   "scudo_sha": "c93eaef07335ec6a826c27d2da2f2642e120f0a5",
+   "model": "scudo-fast",
+   "proof_type": "local",
+   "format": "scudo.decision-token/1",
+   "harness": "scudo.eval_notebook",
+   "runtime": {
+    "name": "unsloth",
+    "version": "2026.10.6"
+   },
+   "weights": [
+    {
+     "repo": "Qwen/Qwen3.5-4B",
+     "revision": "851bf6e806efd8d0a36b00ddf55e13ccb7b8cd0a",
+     "filename": "model.safetensors-00001-of-00002.safetensors",
+     "sha256": "26a93f066e1916adb13453dae5a0c707c0fbc71299ed98779571a907b8e74c61"
+    },
+    {
+     "repo": "Qwen/Qwen3.5-4B",
+     "revision": "851bf6e806efd8d0a36b00ddf55e13ccb7b8cd0a",
+     "filename": "model.safetensors-00002-of-00002.safetensors",
+     "sha256": "cb544bd9bfae93dc59b0f22b292f5933573854a7f9b97835c67060d7d910e188"
+    },
+    {
+     "repo": "Naicud/scudo-checkpoints",
+     "revision": "e7124a687ce3721a29bfb6b68a461357c0400659",
+     "filename": "adapter_model.safetensors",
+     "sha256": "289eaf40ab0f064fb9d38a1a56087be36489970808d9f43d3ba4344fcf07951d"
+    }
+   ],
+   "dedup": "NOT_RUN",
+   "on": "2026-10-15",
+   "benchmarks": {
+    "aegis2-test": {
+     "all": {
+      "cases": 500,
+      "errors": 0,
+      "unsupported": 0,
+      "accuracy": 0.822,
+      "binary_f1": 0.8342644320297951,
+      "false_positive_rate": 0.1939655172413793,
+      "abstention_no_violation": 0.0,
+      "ece": 0.06833130664869788
+     }
+    },
+    "aegis2-test/human-labels": {
+     "all": {
+      "cases": 412,
+      "errors": 0,
+      "unsupported": 0,
+      "accuracy": 0.8349514563106796,
+      "binary_f1": 0.8341463414634147,
+      "false_positive_rate": 0.20642201834862386,
+      "abstention_no_violation": 0.0,
+      "ece": 0.06483345634006574
+     }
+    },
+    "canttalk-test": {
+     "all": {
+      "cases": 307,
+      "errors": 0,
+      "unsupported": 0,
+      "accuracy": 0.7719869706840391,
+      "binary_f1": 0.46153846153846156,
+      "false_positive_rate": 0.004807692307692308,
+      "abstention_no_violation": 0.0,
+      "ece": 0.08788479373655572
+     }
+    },
+    "jbb-behaviors": {
+     "all": {
+      "cases": 200,
+      "errors": 0,
+      "unsupported": 0,
+      "accuracy": 0.805,
+      "binary_f1": 0.832618025751073,
+      "false_positive_rate": 0.36,
+      "abstention_no_violation": 0.0,
+      "ece": 0.1133880460439312
+     }
+    },
+    "nemotron3-test": {
+     "all": {
+      "cases": 500,
+      "errors": 0,
+      "unsupported": 0,
+      "accuracy": 0.85,
+      "binary_f1": 0.8502994011976047,
+      "false_positive_rate": 0.1553784860557769,
+      "abstention_no_violation": 0.0,
+      "ece": 0.047458071359667814
+     },
+     "en": {
+      "cases": 270,
+      "errors": 0,
+      "unsupported": 0,
+      "accuracy": 0.8592592592592593,
+      "binary_f1": 0.8633093525179856,
+      "false_positive_rate": 0.13846153846153847,
+      "abstention_no_violation": 0.0,
+      "ece": 0.042577976190813945
+     },
+     "it": {
+      "cases": 230,
+      "errors": 0,
+      "unsupported": 0,
+      "accuracy": 0.8391304347826087,
+      "binary_f1": 0.8340807174887891,
+      "false_positive_rate": 0.17355371900826447,
+      "abstention_no_violation": 0.0,
+      "ece": 0.05441947346697039
+     }
+    },
+    "nemotron3-test/human-labels": {
+     "all": {
+      "cases": 289,
+      "errors": 0,
+      "unsupported": 0,
+      "accuracy": 0.8235294117647058,
+      "binary_f1": 0.7935222672064778,
+      "false_positive_rate": 0.16167664670658682,
+      "abstention_no_violation": 0.0,
+      "ece": 0.07850197198405227
+     },
+     "en": {
+      "cases": 141,
+      "errors": 0,
+      "unsupported": 0,
+      "accuracy": 0.8156028368794326,
+      "binary_f1": 0.7678571428571429,
+      "false_positive_rate": 0.15294117647058825,
+      "abstention_no_violation": 0.0,
+      "ece": 0.08999461262476793
+     },
+     "it": {
+      "cases": 148,
+      "errors": 0,
+      "unsupported": 0,
+      "accuracy": 0.831081081081081,
+      "binary_f1": 0.8148148148148148,
+      "false_positive_rate": 0.17073170731707318,
+      "abstention_no_violation": 0.0,
+      "ece": 0.07512829573891307
+     }
+    },
+    "open-jev-heldout": {
+     "all": {
+      "cases": 500,
+      "errors": 0,
+      "unsupported": 0,
+      "accuracy": 0.63,
+      "binary_f1": 0.30769230769230765,
+      "false_positive_rate": 0.2857142857142857,
+      "abstention_no_violation": 0.012755102040816327,
+      "ece": 0.06171552752012975
+     }
+    },
+    "orbench-hard": {
+     "all": {
+      "cases": 500,
+      "errors": 0,
+      "unsupported": 0,
+      "accuracy": 0.422,
+      "binary_f1": null,
+      "false_positive_rate": 0.578,
+      "abstention_no_violation": 0.0,
+      "ece": 0.3282732860560214
+     }
+    },
+    "toxicchat-test": {
+     "all": {
+      "cases": 500,
+      "errors": 0,
+      "unsupported": 0,
+      "accuracy": 0.918,
+      "binary_f1": 0.481012658227848,
+      "false_positive_rate": 0.0794979079497908,
+      "abstention_no_violation": 0.0,
+      "ece": 0.03008927750543115
+     }
+    },
+    "toxicchat-test/human-labels": {
+     "all": {
+      "cases": 264,
+      "errors": 0,
+      "unsupported": 0,
+      "accuracy": 0.8636363636363636,
+      "binary_f1": 0.5135135135135135,
+      "false_positive_rate": 0.13636363636363635,
+      "abstention_no_violation": 0.0,
+      "ece": 0.06432536604828192
+     }
+    },
+    "xstest-it": {
+     "all": {
+      "cases": 500,
+      "errors": 0,
+      "unsupported": 0,
+      "accuracy": 0.836,
+      "binary_f1": 0.8305785123966942,
+      "false_positive_rate": 0.213768115942029,
+      "abstention_no_violation": 0.0,
+      "ece": 0.03902094334209017
+     },
+     "en": {
+      "cases": 258,
+      "errors": 0,
+      "unsupported": 0,
+      "accuracy": 0.8565891472868217,
+      "binary_f1": 0.8438818565400844,
+      "false_positive_rate": 0.18791946308724833,
+      "abstention_no_violation": 0.0,
+      "ece": 0.04110144941545693
+     },
+     "it": {
+      "cases": 242,
+      "errors": 0,
+      "unsupported": 0,
+      "accuracy": 0.8140495867768595,
+      "binary_f1": 0.8178137651821863,
+      "false_positive_rate": 0.2440944881889764,
+      "abstention_no_violation": 0.0,
+      "ece": 0.0521611435751926
+     }
+    },
+    "xstest": {
+     "all": {
+      "cases": 450,
+      "errors": 0,
+      "unsupported": 0,
+      "accuracy": 0.8711111111111111,
+      "binary_f1": 0.8632075471698114,
+      "false_positive_rate": 0.164,
+      "abstention_no_violation": 0.0,
+      "ece": 0.020873226650296225
+     }
+    }
+   }
+  }
+ ]
+}

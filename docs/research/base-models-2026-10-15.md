@@ -334,7 +334,11 @@ Sullo stesso campione di casi per ogni modello:
    meno benchmark.
 3. **Vincoli secondari**: tasso di over-refusal su XSTest, XSTest-IT e
    OR-Bench-hard non peggiore del controllo di oltre 3 punti; ECE non peggiore di
-   oltre 0,02; divario IT–EN della macro-F1 non oltre 3 punti.
+   oltre 0,02; divario IT–EN della macro-F1 non oltre 3 punti, misurato sui soli
+   benchmark con casi in entrambe le lingue (Nemotron e XSTest-IT): le medie per
+   lingua della metrica primaria coprono insiemi di benchmark diversi, e la loro
+   differenza misurerebbe i benchmark solo inglesi, non la lingua (il controllo
+   ne usciva a +7 punti con l'italiano davanti).
 4. **Sostituzione del controllo** solo se la metrica primaria migliora di almeno
    2 punti **e** l'intervallo bootstrap al 95% della differenza appaiata (stessi
    casi) esclude lo zero. Il rumore di readout misurato in #2 (un verdetto su
@@ -348,6 +352,27 @@ Sullo stesso campione di casi per ogni modello:
 
 Ogni risultato riporta SHA di Scudo, revisione e digest dei pesi, revisione di
 llama.cpp e tipo di prova; un numero senza queste voci non entra nel confronto.
+
+### Risultato della fase F (eval del 15–16 ottobre 2026)
+
+Eval `c93eaef` su Colab A100, prova `local`, stessi 3957 casi appaiati per i tre
+adapter (500 per benchmark, seme 3407), zero errori di readout. Adapter:
+`qwen35-4b@f4f5a84`, `gemma4-e4b@fa039d8`, `ministral3-3b@d2c8d3b`. Report in
+`Naicud/scudo-checkpoints` sotto `eval/c93eaef…/`, aggregati in
+[`scoreboard.md`](../scoreboard.md). La deduplica nei report risulta `NOT_RUN`
+(ingest non configurato nel notebook); verificata a parte sulla build
+`ingest-7b735f0` (`a7fa42d`): PASS, configurata nel notebook da `ec5380a`.
+
+| | IT | EN | primaria | Δ (IC 95%) | divario IT–EN | over-refusal | ECE | verdetto |
+|---|---|---|---|---|---|---|---|---|
+| Qwen3.5-4B (controllo) | 0,814 | 0,741 | 0,777 | – | −0,042 | 0,395 | 0,058 | – |
+| Gemma 4 E4B | 0,852 | 0,756 | 0,804 | +0,027 (+0,010; +0,044) | +0,004 | 0,390 | 0,084 | escluso: ECE +0,026 |
+| Ministral 3 3B | 0,768 | 0,683 | 0,726 | −0,052 (−0,070; −0,034) | −0,052 | 0,496 | 0,109 | escluso: over-refusal, ECE, divario |
+
+Il controllo resta. Gemma 4 E4B supera la soglia di guadagno con intervallo
+sopra lo zero ma manca il vincolo di calibrazione di 0,006 ed è fuori dall'ADR
+0001; il controllo stesso supera il limite di divario (−4,2 punti, italiano
+dietro sui benchmark bilingui).
 
 ### Cosa cambia nel codice (minimo)
 
