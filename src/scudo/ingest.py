@@ -110,7 +110,10 @@ def load_rows(entry: Entry, split: str, *, cache_dir: Path) -> Iterable[dict]:
 
 
 def benchmark_index(entries: list[Entry], loader: Loader) -> Index:
-    """Testi dei benchmark; con un convertitore anche le evidenze nella forma del training."""
+    """Indice di deduplica dei benchmark per training e teacher.
+
+    Con un convertitore indicizza anche le evidenze nella forma del training.
+    """
     index = Index()
     for bench in entries:
         converter = CONVERTERS.get(bench.id)

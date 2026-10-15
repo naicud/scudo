@@ -8,7 +8,8 @@ ciascuno di essi il pilot non parte. La configurazione nomina solo la variabile
 d'ambiente della chiave, mai la chiave.
 
 Le uscite del teacher sono candidate: un JSON stretto con verdetto e
-ragionamento breve (`parse_content`); il client è `scudo.teacher_client`.
+ragionamento breve (`parse_content`), o con un solo campo di testo per
+traduzione e generazione (`parse_field`); il client è `scudo.teacher_client`.
 """
 
 import json
@@ -159,17 +160,32 @@ def messages(criterion: str, evidence: str) -> list[dict]:
 _FENCE = re.compile(r"```(?:json)?\s*\n(.*)\n\s*```", re.DOTALL)
 
 
-def parse_content(content) -> tuple[Verdict, str]:
-    """Verdetto e ragionamento dal JSON stretto; tollera solo un blocco ```json attorno."""
+def _json(content) -> object:
+    """JSON del contenuto; tollera solo un blocco ```json attorno."""
     if not isinstance(content, str):
         raise Malformed("contenuto assente")
     text = content.strip()
     if fence := _FENCE.fullmatch(text):
         text = fence.group(1).strip()
     try:
-        data = json.loads(text)
+        return json.loads(text)
     except json.JSONDecodeError:
         raise Malformed("non è JSON") from None
+
+
+def parse_field(content, key: str) -> str:
+    """Testo non vuoto di un JSON stretto con la sola chiave `key` (traduzione, generazione)."""
+    data = _json(content)
+    if not isinstance(data, dict) or set(data) != {key}:
+        raise Malformed(f"serve esattamente la chiave {key}")
+    if not isinstance(data[key], str) or not data[key].strip():
+        raise Malformed(f"{key} vuoto")
+    return data[key].strip()
+
+
+def parse_content(content) -> tuple[Verdict, str]:
+    """Verdetto e ragionamento dal JSON stretto; tollera solo un blocco ```json attorno."""
+    data = _json(content)
     if not isinstance(data, dict) or set(data) != {"verdict", "reasoning"}:
         raise Malformed("servono esattamente le chiavi verdict e reasoning")
     if data["verdict"] not in SEMANTIC_IDS:

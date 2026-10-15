@@ -202,4 +202,5 @@ valida con lo spot-check di #7.
 La persona sceglie il teacher dal report, registra provider, versione e termini
 verificati (il TOML e `summary.md` nell'issue #5) e, solo se vuole procedere,
 esegue `confirm-volume`. Gli strumenti del volume (#7, #8, #9) chiamano
-`scudo.budget.require_volume_confirmation` prima di spendere.
+`scudo.budget.require_volume_confirmation` prima di spendere. Dati italiani
+(#7): [italian-data.md](italian-data.md).

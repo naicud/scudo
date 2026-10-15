@@ -155,3 +155,8 @@ def training(entries: list[Entry] | None = None) -> list[Entry]:
 def benchmarks(entries: list[Entry] | None = None) -> list[Entry]:
     """Registro dei benchmark held-out: id, config, split, revisione, campi di testo."""
     return [e for e in (load() if entries is None else entries) if e.role == "benchmark"]
+
+
+def training_entry(entries: list[Entry], dataset_id: str, split: str) -> Entry | None:
+    """Voce di training per id del dataset e split, se c'è; il cancello resta `problems`."""
+    return next((e for e in training(entries) if e.id == dataset_id and split in e.splits), None)

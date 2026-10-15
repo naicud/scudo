@@ -184,3 +184,35 @@ def test_refused_truncated_and_malformed_have_no_verdict(response, status):
     judge, _, _ = client((200, response))
     outcome = judge.judge(MESSAGES)
     assert (outcome.status, outcome.verdict) == (status, None)
+
+
+@pytest.mark.parametrize("content", ['{"translation": "Ciao"}',
+                                     '```json\n{"translation": "Ciao"}\n```'])
+def test_single_text_field_is_parsed(content):
+    assert teacher.parse_field(content, "translation") == "Ciao"
+
+
+@pytest.mark.parametrize("content", [None, "Ciao", '{"translation": ""}', '{"translation": 3}',
+                                     '{"translation": "Ciao", "note": "x"}', '{"text": "Ciao"}'])
+def test_field_output_otherwise_is_malformed(content):
+    with pytest.raises(Malformed):
+        teacher.parse_field(content, "translation")
+
+
+def test_complete_returns_the_text_field_with_usage_and_no_verdict():
+    c, transport, _ = client((200, body('{"translation": "Come cuocio il pane?"}')))
+    outcome = c.complete(MESSAGES, "translation")
+    assert outcome.status == "ok" and outcome.text == "Come cuocio il pane?"
+    assert outcome.verdict is None and outcome.prompt_tokens == 120
+    assert transport.calls[0][2]["messages"] == MESSAGES
+
+
+@pytest.mark.parametrize(("response", "status"), [
+    (body("I'm sorry, I can't help with that."), "refused"),
+    (body('{"verdict": "VIOLATION", "reasoning": "x"}'), "malformed"),
+    (body('{"translation": "Ciao"}', finish="length"), "truncated"),
+])
+def test_complete_failures_have_no_text(response, status):
+    c, _, _ = client((200, response))
+    outcome = c.complete(MESSAGES, "translation")
+    assert outcome.status == status and outcome.text is None

@@ -5,7 +5,8 @@ Il registro è un JSONL fuori dal repository con una riga per evento:
 una chiamata dall'uso reale di token, o il caso peggiore se il provider non lo
 riporta), `pilot_report` (report del pilot scritto) e `volume_confirmation`
 (conferma umana del teacher e della spesa in volume). Il residuo è il tetto v0.1
-meno la somma delle chiamate.
+meno la somma delle chiamate; il residuo del volume è l'importo dell'ultima
+conferma meno le chiamate registrate dopo di essa.
 
 La stima dei token è `ceil(caratteri / 4)`: una stima, non un conteggio del
 tokenizer. Il caso peggiore di una chiamata è la stima dell'ingresso più
@@ -141,3 +142,12 @@ def require_volume_confirmation(ledger: Ledger) -> dict:
         raise BudgetError("generazione in volume rifiutata: manca la conferma umana "
                           "(python -m scudo.pilot confirm-volume)")
     return confirmations[-1]
+
+
+def volume_remaining(ledger: Ledger) -> float:
+    """Importo dell'ultima conferma del volume meno le chiamate registrate dopo di essa."""
+    require_volume_confirmation(ledger)
+    records = ledger.records()
+    last = max(i for i, r in enumerate(records) if r["kind"] == "volume_confirmation")
+    spent = math.fsum(r["cost_usd"] for r in records[last + 1:] if r["kind"] == "call")
+    return records[last]["amount_usd"] - spent

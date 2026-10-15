@@ -146,3 +146,12 @@ def test_registry_lists_the_held_out_benchmarks():
             "jbb-behaviors", "orbench-hard", "canttalk-test", "open-jev-heldout"} <= names
     assert all(entry.role == "benchmark" for entry in benchmarks())
     assert all(entry.role == "train" for entry in training())
+
+
+def test_training_entry_is_found_by_dataset_id_and_split():
+    from scudo.manifest import training_entry
+
+    entries = [BENCH, TRAIN]
+    assert training_entry(entries, "org/demo", "train") == TRAIN
+    assert training_entry(entries, "org/demo", "test") is None  # solo benchmark
+    assert training_entry(entries, "org/other", "train") is None

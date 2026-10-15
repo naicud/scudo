@@ -86,3 +86,16 @@ def test_volume_needs_a_recorded_human_confirmation(tmp_path):
                           rationale="pilot ok")
     record = budget.require_volume_confirmation(book)
     assert record["teacher"] == "openai/gpt-oss-120b" and record["by"] == "Mario"
+
+
+def test_volume_remaining_counts_only_calls_after_the_latest_confirmation(tmp_path):
+    book = ledger(tmp_path, 5.0)  # spesa del pilot, prima della conferma
+    with pytest.raises(BudgetError):
+        budget.volume_remaining(book)
+    budget.confirm_volume(book, teacher="openai/gpt-oss-120b", amount_usd=20.0, by="Mario",
+                          rationale="report del pilot")
+    book.append({"kind": "call", "run_id": "it", "cost_usd": 3.0})
+    assert budget.volume_remaining(book) == pytest.approx(17.0)
+    budget.confirm_volume(book, teacher="openai/gpt-oss-120b", amount_usd=10.0, by="Mario",
+                          rationale="nuova conferma")
+    assert budget.volume_remaining(book) == pytest.approx(10.0)

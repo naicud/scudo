@@ -17,7 +17,7 @@ from collections.abc import Callable, Mapping
 from dataclasses import dataclass
 
 from scudo.protocol import Verdict
-from scudo.teacher import ConfigError, Malformed, TeacherConfig, parse_content
+from scudo.teacher import ConfigError, Malformed, TeacherConfig, parse_content, parse_field
 
 RETRY_STATUSES = frozenset({429, 500, 502, 503, 504})
 
@@ -37,6 +37,7 @@ class Outcome:
     reasoning_tokens: int | None = None
     finish_reason: str | None = None
     content: str | None = None  # testo restituito, per l'audit
+    text: str | None = None  # campo letto da `complete` (traduzione, generazione)
     detail: str = ""
     http_status: int | None = None  # solo per gli errori HTTP
 
@@ -89,6 +90,14 @@ class Client:
         return f"Client({self.config.model_id} via {self.config.provider})"
 
     def judge(self, chat: list[dict]) -> Outcome:
+        """Giudizio tri-state: JSON stretto con verdetto e ragionamento."""
+        return self._call(chat, _judgement)
+
+    def complete(self, chat: list[dict], key: str) -> Outcome:
+        """Testo di un JSON stretto con la sola chiave `key`; mai un verdetto."""
+        return self._call(chat, lambda content: {"text": parse_field(content, key)})
+
+    def _call(self, chat: list[dict], parse: Callable[[str], dict]) -> Outcome:
         cfg = self.config
         url = cfg.base_url.rstrip("/") + "/chat/completions"
         body = {**cfg.request_extra, "model": cfg.provider_model, "messages": chat,
@@ -103,7 +112,7 @@ class Client:
             except OSError as error:
                 return Outcome("error", detail=str(error)[:200])
             if status == 200:
-                return _outcome(raw)
+                return _outcome(raw, parse)
             if status not in RETRY_STATUSES:
                 return Outcome("error", detail=_error_detail(status, raw), http_status=status)
             if attempt < self._retries:
@@ -112,7 +121,12 @@ class Client:
                        "tentativi", http_status=status)
 
 
-def _outcome(raw: bytes) -> Outcome:
+def _judgement(content) -> dict:
+    verdict, reasoning = parse_content(content)
+    return {"verdict": verdict, "reasoning": reasoning}
+
+
+def _outcome(raw: bytes, parse: Callable[[str], dict]) -> Outcome:
     try:
         data = json.loads(raw)
         choice = data["choices"][0]
@@ -133,9 +147,9 @@ def _outcome(raw: bytes) -> Outcome:
     if base["finish_reason"] == "length":
         return Outcome("truncated", detail="max_tokens raggiunto", **base)
     try:
-        verdict, reasoning = parse_content(content)
+        parsed = parse(content)
     except Malformed as error:
         if content and _REFUSAL.match(content):
             return Outcome("refused", detail="formula di rifiuto (euristica)", **base)
         return Outcome("malformed", detail=str(error), **base)
-    return Outcome("ok", verdict=verdict, reasoning=reasoning, **base)
+    return Outcome("ok", **parsed, **base)
