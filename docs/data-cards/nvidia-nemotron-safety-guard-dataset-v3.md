@@ -145,11 +145,12 @@ uso o training.
 ## Deduplicazione contro i benchmark
 
 - Benchmark controllati: tutte le voci `benchmark` di `src/scudo/manifest.toml` (test di
-  Aegis 2.0 e di Nemotron v3, XSTest, XSTest-IT, WildGuardTest, ToxicChat test, JBB-Behaviors,
-  OR-Bench-hard-1k), con `python -m scudo.ingest build` (issue #3). Oggi la build è bloccata
-  dal cancello: la voce `nemotron3-train` ha termini dei generatori INCERTO senza decisione
-  umana e WildGuardTest (gated) non ha campi di testo verificati. Il tracer #2 non è
-  ancora deduplicato contro i benchmark esterni.
+  Aegis 2.0 e di Nemotron v3, XSTest, XSTest-IT, ToxicChat test, JBB-Behaviors,
+  OR-Bench-hard-1k, CantTalkAboutThis test, Open-Jev held-out), con
+  `python -m scudo.ingest build` (issue #3). Dal 2026-10-15 la voce `nemotron3-train` è
+  ammessa con decisione del responsabile e rischio registrato nel manifest; WildGuardTest è
+  esclusa finché l'accesso gated non è richiesto. Il tracer #2 è stato addestrato prima
+  della build e non è deduplicato contro i benchmark esterni.
 - Metodo: nella build, SHA-256 del testo normalizzato e near-duplicate MinHash (shingle di 5
   caratteri, 128 bin, LSH 25×5, Jaccard stimata >= 0,8), vedi `docs/datasets.md`. Nel
   tracer #2 resta solo il controllo interno per id e testo esatto tra test held-out e i
@@ -211,6 +212,6 @@ formato richiesto dalla licenza. Le stesse attribuzioni vanno nella model card.
 - Criterio in inglese su testi in italiano: il giudizio dipende dalla lingua del criterio.
   Va tenuto presente nella lettura dei risultati.
 - Held-out piccolo: 200 casi per lingua non bastano per stime precise.
-- Deduplicazione incompleta: il meccanismo esiste (issue #3) ma la build è bloccata dal
-  cancello finché i termini dei generatori restano INCERTO, quindi il rischio di
-  contaminazione resta.
+- Deduplicazione del tracer incompleta: il run #2 precede la build deduplicata (issue #3),
+  quindi per quel run il rischio di contaminazione con i benchmark esterni resta; i run
+  successivi partono dalla build.
