@@ -2,8 +2,10 @@
 
 Il notebook è un artefatto generato: le celle proprie vivono qui come stringhe
 Python, setup, LoRA, addestramento, adapter e GGUF in `scudo.notebook_cells`, e
-`python -m scudo.notebook` riscrive `notebooks/fast_tracer.ipynb`. Solo standard
-library; le dipendenze pesanti vengono importate dentro le celle, su Colab.
+`python -m scudo.notebook` riscrive `notebooks/fast_tracer.ipynb`; con
+`--base <slug>` scrive il notebook di bake-off del candidato
+(`scudo.bakeoff_cells`). Solo standard library; le dipendenze pesanti vengono
+importate dentro le celle, su Colab.
 """
 
 from scudo import nemotron
@@ -232,12 +234,28 @@ CELLS = (
 )
 
 
-def build() -> dict:
-    return notebook(CELLS)
+def bakeoff_path(slug: str) -> str:
+    return f"notebooks/bakeoff_{slug}.ipynb"
 
 
-def main() -> None:
-    print(write(NOTEBOOK_PATH, build()))
+def build(base: str | None = None) -> dict:
+    """Il tracer; con `base` (slug di `scudo.base_models`) il notebook di bake-off."""
+    if base is None:
+        return notebook(CELLS)
+    # Import locale: le celle del bake-off derivano da quelle di questo modulo.
+    from scudo.bakeoff_cells import cells
+    from scudo.base_models import candidate
+
+    return notebook(cells(candidate(base)))
+
+
+def main(argv: list[str] | None = None) -> None:
+    import argparse
+
+    parser = argparse.ArgumentParser(prog="python -m scudo.notebook")
+    parser.add_argument("--base", help="slug del candidato: scrive notebooks/bakeoff_<slug>.ipynb")
+    base = parser.parse_args(argv).base
+    print(write(NOTEBOOK_PATH if base is None else bakeoff_path(base), build(base)))
 
 
 if __name__ == "__main__":

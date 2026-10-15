@@ -3,6 +3,7 @@ import json
 from pathlib import Path
 
 from scudo import notebook as tracer
+from scudo.base_models import CANDIDATES
 from scudo.baselines import BASELINES
 from scudo.eval_notebook import FAST_BASE_REVISION, NOTEBOOK_PATH, build
 from test_notebook import code_cells, python_only
@@ -76,3 +77,39 @@ def test_benchmarks_are_sampled_per_benchmark_with_a_seed():
 def test_fast_points_at_the_tracer_adapter_upload():
     assert '"adapter_revision": "e7124a687ce3721a29bfb6b68a461357c0400659"' in "\n".join(
         code_cells(build()))
+
+
+def fast_entries():
+    source = next(c for c in code_cells(build()) if "EVAL = {" in c)
+    body = source.split("EVAL = ", 1)[1].split("\nRUN_LOG", 1)[0]
+    return ast.literal_eval(body)["fast"]
+
+
+def test_fast_is_a_list_with_the_tracer_first_then_every_bakeoff_candidate():
+    entries = fast_entries()
+    assert entries[0]["name"] == "scudo-fast"
+    assert entries[0]["base_revision"] == FAST_BASE_REVISION
+    assert entries[0]["adapter_revision"] == "e7124a687ce3721a29bfb6b68a461357c0400659"
+    assert (entries[0]["loader"], entries[0]["text_only"], entries[0]["bos_token_id"]) == (
+        "FastLanguageModel", True, None)
+    bakeoff = {e["name"]: e for e in entries[1:]}
+    assert list(bakeoff) == [f"bakeoff-{slug}" for slug in CANDIDATES]
+    for slug, item in CANDIDATES.items():
+        entry = bakeoff[f"bakeoff-{slug}"]
+        assert (entry["base_model"], entry["base_revision"]) == (item.repo, item.revision)
+        assert entry["adapter_repo"] == item.checkpoint_repo
+        assert entry["adapter_revision"] == ""  # commit dell'upload, da fissare dopo il training
+        assert (entry["loader"], entry["text_only"]) == (item.loader, item.text_only)
+        assert (entry["bos_token"], entry["bos_token_id"]) == (item.bos_token, item.bos_token_id)
+    assert len({e["name"] for e in entries}) == len(entries)
+
+
+def test_fast_candidates_share_the_runner_path_and_save_per_case_results():
+    source = text()
+    assert 'for FAST in EVAL["fast"]:' in source
+    assert 'fast_scorer(tok, TransformersBackend(model), seed=EVAL["seed"],' in source
+    assert 'bos_id=FAST["bos_token_id"]' in source
+    assert 'Loader = getattr(unsloth, FAST["loader"])' in source
+    assert 'text_only=FAST["text_only"]' in source
+    assert 'SUMMARY["skipped_models"][FAST["name"]]' in source
+    assert "result_rows(results)" in source and '"results.json"' in source

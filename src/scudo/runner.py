@@ -245,19 +245,22 @@ def scorer_for(name: str, tokenizer: Tokenizer,
     return score_generated
 
 
-def fast_scorer(tokenizer: Tokenizer, backend: Backend, *,
-                seed: int) -> Callable[[Case], Readout]:
+def fast_scorer(tokenizer: Tokenizer, backend: Backend, *, seed: int,
+                bos_id: int | None = None) -> Callable[[Case], Readout]:
     """Il nostro Fast: prompt decision-token senza chat template, lettere all'ultima posizione.
 
     La permutazione delle opzioni è quella di `training_row` con un `Random(seed)`
-    sulla sequenza dei casi; il gold non entra nel prompt.
+    sulla sequenza dei casi; il gold non entra nel prompt. `bos_id`: id del BOS che
+    la base dichiara (`scudo.base_models`), messo prima degli id del prompt invariato.
     """
     letters = letter_ids(tokenizer)
     rng = random.Random(seed)
+    prefix = [] if bos_id is None else [bos_id]
 
     def score(case: Case) -> Readout:
         row = training_row(case.criterion, case.evidence, case.verdict, rng)
-        logits = backend.next_logits(tokenizer.encode(row["prompt"], add_special_tokens=False))
+        logits = backend.next_logits(
+            prefix + tokenizer.encode(row["prompt"], add_special_tokens=False))
         return read_options([float(logits[letters[x]]) for x in OPTION_LETTERS],
                             row["semantic_ids"])
 

@@ -5,10 +5,39 @@ in `scudo.notebook_cells`) e `python -m scudo.eval_notebook` riscrive `notebooks
 library; le dipendenze pesanti si importano dentro le celle, su Colab.
 """
 
+import json
+
+from scudo.base_models import CANDIDATES
 from scudo.notebook_cells import SETUP_HUB_CACHE, notebook, write
 
 NOTEBOOK_PATH = "notebooks/eval.ipynb"
 FAST_BASE_REVISION = "851bf6e806efd8d0a36b00ddf55e13ccb7b8cd0a"  # Qwen/Qwen3.5-4B, come il tracer
+TRACER_ADAPTER_REVISION = "e7124a687ce3721a29bfb6b68a461357c0400659"  # upload dell'adapter, #2
+
+
+def fast_entries() -> list[dict]:
+    """Voci di EVAL["fast"]: il tracer, poi un candidato del bake-off per base."""
+    tracer = {"name": "scudo-fast", "base_model": "Qwen/Qwen3.5-4B",
+              "base_revision": FAST_BASE_REVISION, "adapter_repo": "Naicud/scudo-checkpoints",
+              "adapter_revision": TRACER_ADAPTER_REVISION, "loader": "FastLanguageModel",
+              "text_only": True, "bos_token": None, "bos_token_id": None, "ignore_files": []}
+    bakeoff = [{"name": f"bakeoff-{item.slug}", "base_model": item.repo,
+                "base_revision": item.revision, "adapter_repo": item.checkpoint_repo,
+                "adapter_revision": "", "loader": item.loader, "text_only": item.text_only,
+                "bos_token": item.bos_token, "bos_token_id": item.bos_token_id,
+                "ignore_files": list(item.ignore_files)} for item in CANDIDATES.values()]
+    return [{**entry, "adapter_dir": "adapter", "max_seq_length": 2048}
+            for entry in (tracer, *bakeoff)]
+
+
+def _render(entries: list[dict]) -> str:
+    def literal(value):
+        return repr(value) if value is None or isinstance(value, bool) else json.dumps(
+            value, ensure_ascii=False)
+
+    return "\n".join("        {\n" + "".join(f'            "{key}": {literal(value)},\n'
+                                             for key, value in entry.items()) + "        },"
+                     for entry in entries)
 
 INTRO = """\
 # Scudo - eval di Fast e baseline (issue #4)
@@ -20,7 +49,8 @@ e digest dei pesi, runtime, tipo di prova, conteggi del benchmark e verifica del
 deduplica dell'ingestione.
 
 - Baseline: prova `reference` (pesi pubblicati nel runtime transformers).
-- Il nostro Fast: prova `local` (checkpoint in training, loader Unsloth del tracer).
+- I nostri Fast (il tracer e i candidati del bake-off in `EVAL["fast"]`): prova `local`
+  (checkpoint in training, loader Unsloth), stessi casi e stesso seme per tutti.
 - Rifiuti espliciti, mai silenziosi: WildGuardTest (gated, campi NON VERIFICATI),
   Rizzo Flow (codice remoto incompatibile con transformers 5.17) e APUS-Reflex
   (runtime della card con transformers==5.16.1) finiscono in `skipped_models` o
@@ -44,15 +74,12 @@ EVAL = {
     # Report della build di ingestione (`python -m scudo.ingest build`), in un repository
     # privato a un commit fissato. Vuoto: verifica della deduplica NOT_RUN nei report.
     "ingest_report": {"repo": "", "repo_type": "dataset", "revision": "", "path": "report.json"},
-    # Il nostro Fast: base fissata e commit dell'upload dell'adapter. Vuoto: Fast saltato.
-    "fast": {
-        "base_model": "Qwen/Qwen3.5-4B",
-        "base_revision": "@FAST_BASE_REVISION@",
-        "adapter_repo": "Naicud/scudo-checkpoints",
-        "adapter_revision": "e7124a687ce3721a29bfb6b68a461357c0400659",  # tracer #2
-        "adapter_dir": "adapter",
-        "max_seq_length": 2048,
-    },
+    # I nostri Fast, sugli stessi casi e con lo stesso seme: il tracer (#2) e i candidati
+    # del bake-off (scudo.base_models). adapter_revision e' il commit dell'upload
+    # dell'adapter (RUN_LOG["adapter"] del notebook di training); vuoto: Fast saltato.
+    "fast": [
+@FAST@
+    ],
 }
 RUN_LOG["eval"] = EVAL
 print(json.dumps(EVAL, indent=2))"""
@@ -105,6 +132,7 @@ import torch
 import transformers
 from huggingface_hub import HfApi
 
+from scudo.bakeoff import result_rows
 from scudo.baselines import BASELINES
 from scudo.runner import (
     NO_SUBFOLDERS, ROOT_FILES, RunnerError, TransformersBackend, fast_scorer,
@@ -130,10 +158,14 @@ def headline(report):
 
 
 def evaluate(model, score, **header):
-    \"\"\"Un run su ogni benchmark caricato; report scritti e caricati sul repository privato.\"\"\"
-    out = {}
+    \"\"\"Un run su ogni benchmark caricato; report e risultati per caso sul repository privato.
+
+    `results.json` (benchmark -> righe per caso) e' l'ingresso di `python -m scudo.bakeoff`.
+    \"\"\"
+    out, rows = {}, {}
     for name, loaded in LOADED.items():
         results = run(loaded, score)
+        rows[name] = result_rows(results)
         reports = reports_for(loaded, results, dedup=DEDUP, model=model,
                               scudo_sha=RUN_LOG["scudo_sha"], harness="scudo.eval_notebook",
                               **header)
@@ -145,6 +177,8 @@ def evaluate(model, score, **header):
             out[split] = headline(report)
         out[name]["error_codes"] = dict(Counter(item.error for item in results if item.error))
         print(model, name, json.dumps(out[name], ensure_ascii=False))
+    (REPORT_DIR / model / "results.json").write_text(
+        json.dumps(rows, ensure_ascii=False) + "\\n", encoding="utf-8")
     api.upload_folder(folder_path=str(REPORT_DIR / model), repo_id=EVAL["checkpoint_repo"],
                       path_in_repo=f"eval/{RUN_LOG['scudo_sha']}/{model}",
                       commit_message=f"eval {model}")
@@ -190,32 +224,40 @@ evaluate_baseline("apus-reflex-4b")"""
 
 FAST = """\
 # Ultima cella dei modelli: Unsloth modifica transformers all'import e non deve
-# toccare le baseline. Stesso loader del tracer (text_only); se il loader o l'adapter
-# non combaciano la cella fallisce, senza fallback.
-FAST = EVAL["fast"]
-if not FAST["adapter_revision"]:
-    SUMMARY["skipped_models"]["scudo-fast"] = "adapter non configurato (EVAL['fast'])"
-    print("SALTATO scudo-fast: imposta EVAL['fast']['adapter_revision']")
-else:
+# toccare le baseline. Un run per voce di EVAL["fast"], tutte sullo stesso percorso del
+# runner; loader, text_only e BOS vengono dalla voce, come nel notebook di training.
+# Se loader, adapter o BOS non combaciano la cella fallisce, senza fallback.
+for FAST in EVAL["fast"]:
+    if not FAST["adapter_revision"]:
+        SUMMARY["skipped_models"][FAST["name"]] = "adapter non configurato (EVAL['fast'])"
+        print("SALTATO", FAST["name"], "- imposta adapter_revision")
+        continue
     import unsloth
     from peft import PeftModel
-    from unsloth import FastLanguageModel
 
+    Loader = getattr(unsloth, FAST["loader"])
     base_root, base_weights = fetch_verified(FAST["base_model"], FAST["base_revision"],
-                                             ROOT_FILES, NO_SUBFOLDERS)
+                                             ROOT_FILES, (*NO_SUBFOLDERS, *FAST["ignore_files"]))
     adapter_root, adapter_weights = fetch_verified(
         FAST["adapter_repo"], FAST["adapter_revision"], (f"{FAST['adapter_dir']}/*",))
-    model, tokenizer = FastLanguageModel.from_pretrained(
+    model, tokenizer = Loader.from_pretrained(
         model_name=str(base_root), max_seq_length=FAST["max_seq_length"],
-        load_in_4bit=False, load_in_16bit=True, text_only=True,
+        load_in_4bit=False, load_in_16bit=True, text_only=FAST["text_only"],
     )
     model = PeftModel.from_pretrained(model, str(adapter_root / FAST["adapter_dir"]))
     assert any("lora_A" in name for name, _ in model.named_modules()), "adapter non applicato"
-    FastLanguageModel.for_inference(model)
+    Loader.for_inference(model)
     tok = getattr(tokenizer, "tokenizer", tokenizer)
-    evaluate("scudo-fast", fast_scorer(tok, TransformersBackend(model), seed=EVAL["seed"]),
-             proof_type="local", weights=[*base_weights, *adapter_weights],
-             runtime={"name": "unsloth", "version": unsloth.__version__})"""
+    if FAST["bos_token_id"] is not None and (tok.bos_token, tok.bos_token_id) != (
+            FAST["bos_token"], FAST["bos_token_id"]):
+        raise RuntimeError(f"{FAST['name']}: BOS del tokenizer diverso da quello dichiarato")
+    score = fast_scorer(tok, TransformersBackend(model), seed=EVAL["seed"],
+                        bos_id=FAST["bos_token_id"])
+    evaluate(FAST["name"], score, proof_type="local", weights=[*base_weights, *adapter_weights],
+             runtime={"name": "unsloth", "version": unsloth.__version__})
+    del model, score
+    gc.collect()
+    torch.cuda.empty_cache()"""
 
 SUMMARY_CELL = """\
 # Da incollare nell'issue #4: SHA, verifica della deduplica, benchmark rifiutati,
@@ -240,7 +282,7 @@ separato con il loro runtime."""
 CELLS = (
     ("markdown", "intro", INTRO),
     ("code", "setup", SETUP_HUB_CACHE),
-    ("code", "config", CONFIG.replace("@FAST_BASE_REVISION@", FAST_BASE_REVISION)),
+    ("code", "config", CONFIG.replace("@FAST@", _render(fast_entries()))),
     ("code", "dedup", DEDUP),
     ("code", "data", DATA),
     ("code", "helpers", HELPERS),

@@ -290,6 +290,14 @@ def test_fast_reads_the_decision_token_prompt_without_the_gold():
     assert all(r.margin == pytest.approx(2.0) for r in readouts)
 
 
+def test_fast_bos_is_a_declared_id_before_the_unchanged_prompt():
+    tokenizer = FakeTokenizer()
+    plain, with_bos = FakeBackend(), FakeBackend()
+    fast_scorer(tokenizer, plain, seed=7)(case())
+    fast_scorer(tokenizer, with_bos, seed=7, bos_id=999)(case())
+    assert with_bos.prompts[0] == [999, *plain.prompts[0]]  # stessi byte, solo l'id in testa
+
+
 def test_malformed_readout_is_an_error_and_other_exceptions_stop_the_run():
     def bad(case):
         raise ValueError("readout malformato")

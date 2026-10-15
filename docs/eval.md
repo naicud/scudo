@@ -299,8 +299,8 @@ generazione si verificano solo su Colab.
 
 `python -m scudo.eval_notebook` genera `notebooks/eval.ipynb` (un test lo
 confronta con il file committato). Celle: setup, config, verifica della
-deduplica, caricamento dei benchmark, helper, una cella per baseline, il Fast
-per ultimo (Unsloth modifica transformers all'import), riepilogo. I report
+deduplica, caricamento dei benchmark, helper, una cella per baseline, i Fast
+per ultimi (Unsloth modifica transformers all'import), riepilogo. I report
 vanno in `Naicud/scudo-checkpoints` sotto `eval/<scudo_sha>/<modello>/`; il
 riepilogo per l'issue elenca verifica della deduplica, benchmark rifiutati,
 modelli saltati con il motivo e metriche principali.
@@ -310,3 +310,58 @@ casi (default 500, `benchmarks.sample` con `EVAL["seed"]`): stessi casi per ogni
 modello, così i report si confrontano caso per caso e il run con le baseline
 generative sta in una sessione Colab. `rows` e `dropped` restano quelli del
 benchmark intero.
+
+Ogni modello scrive anche `results.json` (benchmark -> una riga per caso: id,
+lingua, superficie, gold, verdetto, probabilità, errore), l'ingresso del
+confronto del bake-off.
+
+## Bake-off del Fast
+
+Protocollo e regola in
+[`research/base-models-2026-10-15.md`](research/base-models-2026-10-15.md).
+
+- **Candidati.** `scudo.base_models`: per base repository, revisione e licenza
+  rilette il 15 ottobre 2026, loader Unsloth, `text_only`, moduli LoRA e il loro
+  numero atteso, BOS, checkpoint repo `Naicud/scudo-bakeoff-<slug>`. Controllo:
+  `qwen35-4b`, rieseguito con la stessa ricetta.
+- **Training.** `python -m scudo.notebook --base <slug>` scrive
+  `notebooks/bakeoff_<slug>.ipynb`: le celle del tracer con i campi del candidato
+  in `RUN` (quindi nell'impronta del run). Falliscono in modo esplicito: torri
+  visive o audio caricate con `text_only=True`, BOS del tokenizer diverso da
+  quello dichiarato, moduli LoRA diversi da quelli attesi o fuori dal
+  linguaggio, id del primo esempio del trainer diversi da quelli del serving.
+- **BOS.** Il protocollo non cambia. Un candidato con `bos_token_id` (Gemma 4:
+  `<bos>`/2; Ministral 3: `<s>`/1) riceve quell'id prima degli id del prompt in
+  training (testo del BOS in testa al prompt del dataset, verificato sugli id del
+  trainer) e in eval (`fast_scorer(..., bos_id=...)`). Senza regola esplicita,
+  Unsloth 2026.10.5 aggiunge i token speciali del tokenizer solo se il chat
+  template non contiene il BOS: Ministral sarebbe stato addestrato con `<s>` e
+  valutato senza. Verificato sui tokenizer alle revisioni fissate
+  (transformers 5.17): testo del BOS + prompt = `[bos_id]` + id del prompt, e la
+  lettera resta un token separato. Il backend nativo oggi non mette BOS: per il
+  passo live di un candidato con BOS il bridge deve applicare la stessa regola.
+- **Eval.** `EVAL["fast"]` è una lista: il tracer e una voce per candidato
+  (`bakeoff-<slug>`), con `adapter_revision` da riempire con il commit
+  dell'upload dell'adapter. Stesso campione, stesso seme, stesso
+  `runner.fast_scorer`.
+- **Confronto.** `python -m scudo.bakeoff --control <cartella> --candidate
+  <cartella> [...]` sulle cartelle `eval/<scudo_sha>/<modello>/` scaricate. Sui
+  casi comuni (`eval_report.shared_cases`) calcola:
+  - metrica primaria: macro-F1 su VIOLATION e NO_VIOLATION per benchmark e
+    lingua (media delle classi con gold nel gruppo; F1 = 2TP/(2TP+FP+FN); un
+    errore è una risposta sbagliata), media per lingua sui benchmark, poi media
+    di IT ed EN; `mixed` resta fuori. Dove il report ha F1 `None` (classe con
+    gold mai predetta) la regola conta 0;
+  - over-refusal (casi `over_refusal` con gold NO_VIOLATION giudicati VIOLATION,
+    su tutti i benchmark) e ECE: differenza con il controllo;
+  - divario IT–EN della metrica primaria del candidato;
+  - intervallo bootstrap appaiato al 95% della differenza di metrica primaria:
+    1.000 ricampionamenti, `random.Random(3407)`, stratificati per benchmark e
+    lingua, gli stessi casi per i due modelli, percentili 2,5 e 97,5.
+
+  Verdetto: `ESCLUSO` con errori di readout, over-refusal oltre +3 punti, ECE
+  oltre +0,02 o divario IT–EN oltre 3 punti; `SOSTITUISCE IL CONTROLLO` con
+  guadagno di almeno 2 punti e intervallo sopra lo zero (poi secondo seme);
+  altrimenti `NON SUPERA IL CONTROLLO`. I cancelli esterni (GGUF nel backend
+  nativo, conferma dell'ADR 0001 per Gemma, BOS nel bridge, profilo Mac) restano
+  fuori dal calcolo.

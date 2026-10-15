@@ -132,6 +132,11 @@ def _summary(results: Sequence[EvalResult]) -> dict:
     return {**_metrics(supported), "unsupported": unsupported}
 
 
+def summarize(results: Sequence[EvalResult]) -> dict:
+    """Le metriche di `overall` di un report, per un gruppo qualsiasi di risultati."""
+    return _summary(results)
+
+
 def _grouped(results: Sequence[EvalResult], key: Callable[[EvalResult], str]) -> dict:
     groups = defaultdict(list)
     for item in results:
