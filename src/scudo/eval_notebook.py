@@ -13,6 +13,12 @@ from scudo.notebook_cells import SETUP_HUB_CACHE, notebook, write
 NOTEBOOK_PATH = "notebooks/eval.ipynb"
 FAST_BASE_REVISION = "851bf6e806efd8d0a36b00ddf55e13ccb7b8cd0a"  # Qwen/Qwen3.5-4B, come il tracer
 TRACER_ADAPTER_REVISION = "e7124a687ce3721a29bfb6b68a461357c0400659"  # upload dell'adapter, #2
+# Upload degli adapter dei run di bake-off su Colab A100 (RUN_LOG["adapter"] di ogni notebook).
+BAKEOFF_ADAPTER_REVISIONS = {
+    "qwen35-4b": "f4f5a84c06bcb7d121dff9e0823d0478fb6219da",
+    "gemma4-e4b": "fa039d8cedcb3e0784adf64fa5a422a975b96428",
+    "ministral3-3b": "d2c8d3bbadd87f50cfe9bd9b469481baf23a861e",
+}
 
 
 def fast_entries() -> list[dict]:
@@ -23,7 +29,8 @@ def fast_entries() -> list[dict]:
               "text_only": True, "bos_token": None, "bos_token_id": None, "ignore_files": []}
     bakeoff = [{"name": f"bakeoff-{item.slug}", "base_model": item.repo,
                 "base_revision": item.revision, "adapter_repo": item.checkpoint_repo,
-                "adapter_revision": "", "loader": item.loader, "text_only": item.text_only,
+                "adapter_revision": BAKEOFF_ADAPTER_REVISIONS.get(item.slug, ""),
+                "loader": item.loader, "text_only": item.text_only,
                 "bos_token": item.bos_token, "bos_token_id": item.bos_token_id,
                 "ignore_files": list(item.ignore_files)} for item in CANDIDATES.values()]
     return [{**entry, "adapter_dir": "adapter", "max_seq_length": 2048}

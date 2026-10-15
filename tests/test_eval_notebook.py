@@ -5,7 +5,12 @@ from pathlib import Path
 from scudo import notebook as tracer
 from scudo.base_models import CANDIDATES
 from scudo.baselines import BASELINES
-from scudo.eval_notebook import FAST_BASE_REVISION, NOTEBOOK_PATH, build
+from scudo.eval_notebook import (
+    BAKEOFF_ADAPTER_REVISIONS,
+    FAST_BASE_REVISION,
+    NOTEBOOK_PATH,
+    build,
+)
 from test_notebook import code_cells, python_only
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -105,7 +110,7 @@ def test_fast_is_a_list_with_the_tracer_first_then_every_bakeoff_candidate():
         entry = bakeoff[f"bakeoff-{slug}"]
         assert (entry["base_model"], entry["base_revision"]) == (item.repo, item.revision)
         assert entry["adapter_repo"] == item.checkpoint_repo
-        assert entry["adapter_revision"] == ""  # commit dell'upload, da fissare dopo il training
+        assert entry["adapter_revision"] == BAKEOFF_ADAPTER_REVISIONS[slug]  # upload del run
         assert (entry["loader"], entry["text_only"]) == (item.loader, item.text_only)
         assert (entry["bos_token"], entry["bos_token_id"]) == (item.bos_token, item.bos_token_id)
     assert len({e["name"] for e in entries}) == len(entries)
@@ -120,3 +125,11 @@ def test_fast_candidates_share_the_runner_path_and_save_per_case_results():
     assert 'text_only=FAST["text_only"]' in source
     assert 'SUMMARY["skipped_models"][FAST["name"]]' in source
     assert "result_rows(results)" in source and '"results.json"' in source
+
+
+def test_bakeoff_adapters_are_the_uploads_of_the_real_runs():
+    assert BAKEOFF_ADAPTER_REVISIONS == {
+        "qwen35-4b": "f4f5a84c06bcb7d121dff9e0823d0478fb6219da",
+        "gemma4-e4b": "fa039d8cedcb3e0784adf64fa5a422a975b96428",
+        "ministral3-3b": "d2c8d3bbadd87f50cfe9bd9b469481baf23a861e",
+    }
