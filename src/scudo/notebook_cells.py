@@ -48,7 +48,30 @@ RUN_LOG["scudo_sha"] = subprocess.run(
 print("scudo", RUN_LOG["scudo_sha"])
 
 !pip install -q -e "/content/scudo[train]"
-sys.path.insert(0, f"{REPO_DIR}/src")  # l'editable install non e' visibile al kernel gia' avviato"""
+sys.path.insert(0, f"{REPO_DIR}/src")  # l'editable install non e' visibile al kernel gia' avviato
+
+# causal-conv1d 1.7.0 su PyPI e' solo sdist e le wheel GitHub si fermano a torch 2.10:
+# con torch 2.14 pip compila da sorgente per 9 architetture CUDA (lungo; serve un nvcc
+# con la stessa major CUDA di torch). Opt-in: senza, la convoluzione resta su PyTorch.
+BUILD_CAUSAL_CONV1D = False
+if BUILD_CAUSAL_CONV1D:
+    subprocess.run([sys.executable, "-m", "pip", "install", "-q", "ninja", "packaging"],
+                   check=True)
+    conv_build = subprocess.run([sys.executable, "-m", "pip", "install", "-q",
+                                 "--no-build-isolation", "causal-conv1d==1.7.0"])
+    RUN_LOG["causal_conv1d_build_returncode"] = conv_build.returncode
+
+# Kernel linear-attention di Qwen3.5 (fla dall'extra train, causal-conv1d opt-in): il
+# ripiego su PyTorch e' corretto ma lento, quindi si registra senza fermare il run.
+# Sottoprocesso: `fla` importa transformers, che qui deve arrivare dopo Unsloth.
+kernel_probe = subprocess.run([sys.executable, "-m", "scudo.linear_kernels"],
+                              cwd=f"{REPO_DIR}/src", capture_output=True, text=True)
+RUN_LOG["linear_attention_kernels"] = (
+    json.loads(kernel_probe.stdout) if kernel_probe.returncode == 0
+    else {"probe": f"fallita: {kernel_probe.stderr[-500:]}"}
+)
+for name, state in RUN_LOG["linear_attention_kernels"].items():
+    print(f"{name}: {state}")"""
 
 # L'eval e il Fast v0.1 fissano la cache Hub prima di qualsiasi import di huggingface_hub:
 # `scudo.ingest.load_rows` rifiuta una cache fuori da CACHE_DIR.

@@ -19,6 +19,8 @@ train = [
   "datasets>=4.8,<5",
   "trl>=1.15,<2",
   "peft>=0.21,<1",
+  # Kernel Triton dei layer Gated DeltaNet di Qwen3.5 (wheel pure Python, solo CUDA).
+  "flash-linear-attention>=0.5.2,<0.6; sys_platform == 'linux'",
 ]
 
 [dependency-groups]
