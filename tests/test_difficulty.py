@@ -1,4 +1,5 @@
 import hashlib
+import math
 import random
 
 import pytest
@@ -8,6 +9,7 @@ from scudo.difficulty import (
     CRITERION,
     EASY,
     HARD,
+    MARGIN_THRESHOLD,
     ROUTING_DIFFICULTY_REF,
     as_difficulty,
     assess,
@@ -85,6 +87,26 @@ def test_labels_from_teacher_disagreement_only():
     assert label(index, "e", "VIOLATION", teachers) == (None, "no_teacher_record")
     assert label(index, "zz", "VIOLATION", teachers) == (None, "no_teacher_record")
     assert assess(index, "a", ()) == ("no_teacher_record", ())
+
+
+def test_low_teacher_margin_marks_an_agreed_case_hard():
+    index = index_outcomes([
+        {**out("t1", "a", verdict="VIOLATION"), "margin": 3.0},
+        {**out("t2", "a", verdict="VIOLATION"), "margin": 2.0},
+        {**out("t1", "b", verdict="VIOLATION"), "margin": 3.0},
+        {**out("t2", "b", verdict="VIOLATION"), "margin": 0.4},
+        {**out("t1", "c", verdict="VIOLATION"), "margin": 3.0},
+        out("t2", "c", verdict="VIOLATION"),
+    ])
+    teachers = jury(index)
+    assert MARGIN_THRESHOLD == pytest.approx(math.log(4))
+    assert label(index, "a", "VIOLATION", teachers, margin_threshold=1.0) == (EASY, "agree")
+    assert label(index, "b", "VIOLATION", teachers, margin_threshold=1.0) == (HARD, "low_margin")
+    assert label(index, "b", "VIOLATION", teachers, margin_threshold=0.3) == (EASY, "agree")
+    assert label(index, "b", "VIOLATION", teachers) == (EASY, "agree")  # senza soglia: solo accordo
+    # Senza il margine di un teacher resta l'accordo, contato a parte.
+    assert label(index, "c", "VIOLATION", teachers, margin_threshold=1.0) == (
+        EASY, "agree_margin_missing")
 
 
 def test_conflicting_outcomes_for_the_same_pair_are_an_error():

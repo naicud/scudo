@@ -40,15 +40,30 @@ Dagli esiti dei teacher nel formato del pilot (`outcomes.jsonl`). La giuria sono
 teacher presenti negli esiti:
 
 - **HARD**: ogni teacher ha un esito `ok` e i verdetti discordano fra loro o con il
-  gold;
-- **EASY**: ogni teacher ha un esito `ok` uguale al gold;
+  gold (`disagree`), oppure concordano ma il margine di almeno un teacher è sotto
+  la soglia (`low_margin`);
+- **EASY**: ogni teacher ha un esito `ok` uguale al gold con margine almeno alla
+  soglia (`agree`) o senza margine (`agree_margin_missing`);
 - **nessuna riga**, contata per motivo: manca l'esito di un teacher
   (`no_teacher_record`) o un esito non è `ok` (`teacher_refused`,
   `teacher_malformed`, ...). Un guasto del teacher non è un segnale di difficoltà.
 
-Gli esiti non portano margine né confidenza: si usa solo il disaccordo. I casi
-`needs_relabel` confermati sono EASY per costruzione (la conferma è l'accordo
-unanime con la label). Il mix si rifiuta se mancano casi HARD o EASY.
+Il **margine** è il campo `margin` dell'esito: logprob del token che decide il
+verdetto meno quello della migliore alternativa che inizia un verdetto diverso,
+in nat (`scudo.teacher_margin`). C'è solo se la configurazione del teacher chiede
+i logprob (`request_extra = { logprobs = true, top_logprobs = 5 }`, vedi
+`docs/teacher-pilot.md`) e il provider li restituisce; senza, il margine è
+assente, mai inventato, e conta solo il disaccordo (`agree_margin_missing` nel
+manifest dice quanti casi). Se la migliore alternativa non è nel top-k il
+margine è un limite inferiore. Soglia: `--margin-threshold` di `mix_cli build`,
+default `ln 4 ≈ 1,386` (verdetto meno di 4 volte più probabile della migliore
+alternativa): una convenzione dichiarata da tarare sugli esiti del pilot, non
+una misura. Il manifest registra soglia (`difficulty_margin_threshold`) e righe
+per motivo (`composition.difficulty.by_reason`).
+
+I casi `needs_relabel` confermati sono concordi per costruzione (la conferma è
+l'accordo unanime con la label) e diventano HARD solo per margine basso. Il mix
+si rifiuta se mancano casi HARD o EASY.
 
 ## Categorie
 

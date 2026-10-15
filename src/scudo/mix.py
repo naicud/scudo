@@ -170,8 +170,13 @@ def _composition(rows: Sequence[dict]) -> dict:
 
 
 def build(candidates: Sequence[PoolCase], *, outcomes: difficulty.Index, targets: Targets,
-          seed: int) -> tuple[list[dict], dict]:
-    """Righe del mix (semantiche e di difficoltà) e statistiche per il manifest."""
+          seed: int, margin_threshold: float | None = difficulty.MARGIN_THRESHOLD
+          ) -> tuple[list[dict], dict]:
+    """Righe del mix (semantiche e di difficoltà) e statistiche per il manifest.
+
+    `margin_threshold`: margine del teacher sotto cui un caso concorde è HARD
+    (`difficulty.label`); None usa solo il disaccordo.
+    """
     teachers = difficulty.jury(outcomes)
     clean, drops, conflicts = mix_clean.dedup(candidates)
     clean, relabelled = mix_clean.relabel(clean, outcomes, teachers)
@@ -186,11 +191,14 @@ def build(candidates: Sequence[PoolCase], *, outcomes: difficulty.Index, targets
         rows.append({**semantic, "task": "semantic", "entry": pooled.entry, "key": pooled.key,
                      "category": category(pooled.case)})
     rng, no_label, semantic_rows = random.Random(f"difficulty:{seed}"), Counter(), list(rows)
+    reasons = Counter()
     for pooled, semantic in zip(chosen, semantic_rows, strict=True):
-        verdict, reason = difficulty.label(outcomes, pooled.key, pooled.case.verdict, teachers)
+        verdict, reason = difficulty.label(outcomes, pooled.key, pooled.case.verdict, teachers,
+                                           margin_threshold=margin_threshold)
         if verdict is None:
             no_label[reason] += 1
             continue
+        reasons[reason] += 1
         rows.append({**{k: semantic[k] for k in ("source", "source_id", "language", "surface",
                                                   "entry", "key", "category")},
                      **difficulty.row(pooled.case, verdict, rng), "task": "difficulty",
@@ -203,7 +211,7 @@ def build(candidates: Sequence[PoolCase], *, outcomes: difficulty.Index, targets
     rows.sort(key=lambda r: hashlib.sha256(f"{seed}:{r['task']}:{r['key']}".encode()).hexdigest())
     stats = {
         "format": FORMAT_VERSION, "difficulty_criterion": difficulty.ROUTING_DIFFICULTY_REF,
-        "seed": seed, "targets": asdict(targets), "overrides": targets.overrides(),
+        "difficulty_margin_threshold": margin_threshold, "seed": seed, "targets": asdict(targets), "overrides": targets.overrides(),
         "jury": list(teachers),
         "candidates": dict(sorted(Counter(p.entry for p in candidates).items())),
         "drops": dict(sorted(drops.items())), "label_conflicts": dict(sorted(conflicts.items())),
@@ -211,6 +219,7 @@ def build(candidates: Sequence[PoolCase], *, outcomes: difficulty.Index, targets
         "composition": {"semantic": _composition(semantic_rows),
                         "difficulty": {**_composition(difficulty_rows),
                                        "by_difficulty": dict(sorted(hard.items())),
+                                       "by_reason": dict(sorted(reasons.items())),
                                        "no_label": dict(sorted(no_label.items()))}},
     }
     return rows, stats

@@ -1,7 +1,8 @@
 """Client chat completions compatibile OpenAI su urllib, solo standard library.
 
 Ritenta con backoff esponenziale solo 429 e 5xx; registra l'uso di token della
-risposta. La chiave si legge dalla variabile d'ambiente della configurazione, va
+risposta e, se il provider restituisce i logprob (`logprobs`/`top_logprobs` in
+`request_extra`), il margine del verdetto (`scudo.teacher_margin`). La chiave si legge dalla variabile d'ambiente della configurazione, va
 solo nell'header e non compare mai in record, repr o errori. Rifiuto,
 troncamento, output malformato, timeout ed errore restano tali, senza verdetto:
 non diventano mai `NO_VIOLATION`.
@@ -18,6 +19,7 @@ from dataclasses import dataclass
 
 from scudo.protocol import Verdict
 from scudo.teacher import ConfigError, Malformed, TeacherConfig, parse_content, parse_field
+from scudo.teacher_margin import verdict_margin
 
 RETRY_STATUSES = frozenset({429, 500, 502, 503, 504})
 
@@ -38,6 +40,7 @@ class Outcome:
     finish_reason: str | None = None
     content: str | None = None  # testo restituito, per l'audit
     text: str | None = None  # campo letto da `complete` (traduzione, generazione)
+    margin: float | None = None  # nat, dai logprob del verdetto (`scudo.teacher_margin`)
     detail: str = ""
     http_status: int | None = None  # solo per gli errori HTTP
 
@@ -152,4 +155,6 @@ def _outcome(raw: bytes, parse: Callable[[str], dict]) -> Outcome:
         if content and _REFUSAL.match(content):
             return Outcome("refused", detail="formula di rifiuto (euristica)", **base)
         return Outcome("malformed", detail=str(error), **base)
+    if "verdict" in parsed:
+        parsed["margin"] = verdict_margin(content, parsed["verdict"], choice.get("logprobs"))
     return Outcome("ok", **parsed, **base)

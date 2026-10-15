@@ -7,7 +7,7 @@ from scudo import canttalk
 from scudo.aegis import HARMFUL_REQUEST
 from scudo.cases import Case
 from scudo.default_criteria import INJECTION_DIRECT
-from scudo.difficulty import CRITERION, index_outcomes
+from scudo.difficulty import CRITERION, MARGIN_THRESHOLD, index_outcomes
 from scudo.mix import MixError, Targets, build, category, quotas
 from scudo.mix_clean import dedup, generated, method, relabel
 from scudo.mix_pool import PoolCase
@@ -141,6 +141,23 @@ def test_difficulty_rows_share_the_evidence_of_their_semantic_row():
         assert evidence["untrusted_evidence"] == parent["untrusted_evidence"]
         assert row["verdict"] == ("VIOLATION" if row["difficulty"] == "HARD" else "NO_VIOLATION")
     assert set(stats["composition"]["difficulty"]["by_difficulty"]) == {"HARD", "EASY"}
+
+
+def test_low_teacher_margin_turns_agreed_cases_hard_and_is_recorded():
+    cases = pool()
+    clean = dedup(cases)[0]
+    every_easy = outcomes(clean + generated(clean)[0], disagree_every=10 ** 9)
+    for n, by_teacher in enumerate(every_easy.values()):
+        by_teacher["t1"]["margin"] = 0.5 if n % 4 == 0 else 3.0
+        by_teacher["t2"]["margin"] = 3.0
+    targets = Targets(total=100, languages=EN_ONLY, method_cap=0.5)
+    rows, stats = build(cases, outcomes=every_easy, targets=targets, seed=1)
+    difficulty_stats = stats["composition"]["difficulty"]
+    assert stats["difficulty_margin_threshold"] == pytest.approx(MARGIN_THRESHOLD)
+    assert set(difficulty_stats["by_reason"]) == {"agree", "low_margin"}
+    assert difficulty_stats["by_reason"]["low_margin"] == difficulty_stats["by_difficulty"]["HARD"]
+    with pytest.raises(MixError, match="difficoltà"):  # senza soglia nessun HARD
+        build(cases, outcomes=every_easy, targets=targets, seed=1, margin_threshold=None)
 
 
 def test_mix_is_deterministic_and_independent_of_input_order():

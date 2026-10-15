@@ -1,5 +1,6 @@
 import hashlib
 import json
+import math
 import subprocess
 from collections import Counter
 from dataclasses import asdict, replace
@@ -127,6 +128,10 @@ def test_build_writes_mix_and_a_manifest_that_pins_every_input(tmp_path, monkeyp
     rows = [json.loads(line) for line in (mix / "mix.jsonl").read_text().splitlines()]
     assert len(rows) == manifest["output"]["rows"]
     assert {r["task"] for r in rows} == {"semantic", "difficulty"}
+    assert manifest["difficulty_margin_threshold"] == pytest.approx(math.log(4))
+    other = mix_cli.build_mix(ingest, [], [outcomes], tmp_path / "mix2", margin_threshold=0.2,
+                              override_reason="IT non ancora disponibile (#7)", **common)
+    assert other["difficulty_margin_threshold"] == 0.2
 
 
 def test_mix_output_inside_the_repository_is_refused(tmp_path, monkeypatch):

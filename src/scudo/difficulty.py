@@ -8,15 +8,17 @@ NO_VIOLATION come EASY, INSUFFICIENT o un readout fallito come non valutabile,
 quindi difficile.
 
 Label del primo giro dai giudizi dei teacher, nel formato degli esiti del pilot
-(`outcomes.jsonl`: `teacher`, `key`, `status`, `verdict`, ...): HARD se i teacher
-discordano fra loro o con il gold, EASY se concordano tutti con il gold. Gli esiti
-non portano margine né confidenza: si usa solo il disaccordo. La giuria sono i
+(`outcomes.jsonl`: `teacher`, `key`, `status`, `verdict`, `margin`, ...): HARD se
+i teacher discordano fra loro o con il gold, o se il margine del verdetto di uno di
+loro (dai logprob, `scudo.teacher_margin`) è sotto la soglia; EASY se concordano
+tutti con il gold con margine sufficiente o assente. La giuria sono i
 teacher presenti negli esiti; un caso senza l'esito di ognuno, o con un esito
 diverso da `ok` (rifiuto, malformato, troncato, timeout, errore), non ha label e
 si conta per motivo: un guasto del teacher non è un segnale di difficoltà.
 """
 
 import json
+import math
 import random
 from collections import Counter
 from collections.abc import Iterable, Mapping, Sequence
@@ -36,6 +38,9 @@ CRITERION = (
     "INSUFFICIENT when the difficulty itself cannot be determined."
 )
 HARD, EASY = "VIOLATION", "NO_VIOLATION"  # verdetti del criterio di difficoltà
+# Margine basso: il verdetto del teacher meno di 4 volte più probabile della migliore
+# alternativa. Convenzione dichiarata, da tarare sugli esiti del pilot; non è una misura.
+MARGIN_THRESHOLD = math.log(4)
 
 Index = dict[str, dict[str, dict]]  # key del caso -> teacher -> esito
 
@@ -77,12 +82,25 @@ def assess(index: Index, key: str, teachers: Sequence[str]) -> tuple[str, tuple[
     return "ok", tuple(by_teacher[t]["verdict"] for t in teachers)
 
 
-def label(index: Index, key: str, gold: str, teachers: Sequence[str]) -> tuple[str | None, str]:
-    """(HARD | EASY | None, motivo): HARD con disaccordo fra teacher o con il gold."""
+def label(index: Index, key: str, gold: str, teachers: Sequence[str], *,
+          margin_threshold: float | None = None) -> tuple[str | None, str]:
+    """(HARD | EASY | None, motivo): HARD con disaccordo, o con un margine sotto la soglia.
+
+    Il margine è quello del verdetto di ogni teacher (`margin` dell'esito, in nat);
+    senza soglia conta solo il disaccordo. Un margine assente non è un segnale:
+    il caso concorde resta EASY con motivo `agree_margin_missing`.
+    """
     status, verdicts = assess(index, key, teachers)
     if status != "ok":
         return None, status
-    return (EASY, "agree") if set(verdicts) == {gold} else (HARD, "disagree")
+    if set(verdicts) != {gold}:
+        return HARD, "disagree"
+    if margin_threshold is None:
+        return EASY, "agree"
+    margins = [index[key][t].get("margin") for t in teachers]
+    if any(m is not None and m < margin_threshold for m in margins):
+        return HARD, "low_margin"
+    return EASY, "agree_margin_missing" if None in margins else "agree"
 
 
 def row(case: Case, verdict: str, rng: random.Random) -> dict:

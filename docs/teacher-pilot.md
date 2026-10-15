@@ -94,8 +94,22 @@ max_tokens = <tetto dei token generati, ragionamento incluso>
 # facoltativi
 served_revision = "<revisione se il provider la dichiara>"
 timeout_s = 120.0
-request_extra = { reasoning_effort = "medium" }   # parametri propri del provider
+request_extra = { reasoning_effort = "medium", logprobs = true, top_logprobs = 5 }
 ```
+
+`request_extra` passa al provider parametri propri così come sono. Con
+`logprobs` e `top_logprobs` l'esito registra il margine del verdetto (`margin`,
+in nat, `scudo.teacher_margin`), usato dal criterio di difficoltà
+(`docs/fast-v01.md`). Documentazione letta il 2026-10-15: l'API chat completion
+di Hugging Face Inference Providers accetta `logprobs` (booleano) e
+`top_logprobs` (intero fra 0 e 5;
+https://huggingface.co/docs/inference-providers/tasks/chat-completion); l'API
+compatibile OpenAI di DeepInfra accetta `logprobs` e `top_logprobs` fra 1 e 20
+(https://docs.deepinfra.com/chat/log-probs). Nessuna delle due pagine dice se
+`openai/gpt-oss-120b` e `Qwen/Qwen3.5-397B-A17B` presso il provider li
+restituiscono, né se i token di ragionamento compaiono nei logprob: **non
+verificato**. Se il provider non li restituisce `margin` resta `null` e la
+difficoltà usa solo il disaccordo; il primo esito del pilot lo mostra.
 
 Tutti i campi senza commento «facoltativi» sono obbligatori; prezzi e
 `max_tokens` devono essere positivi, `base_url` https (http solo per
@@ -162,8 +176,8 @@ zero; 401/403 fermano la run senza registrare un esito.
 ## Cosa viene registrato
 
 Nella cartella del pilot (fuori dal repository): `sample.jsonl`,
-`sample-meta.json`, `outcomes.jsonl` (un esito per teacher e caso, con token e
-costo), `report.json`, `summary.md` (da incollare nell'issue),
+`sample-meta.json`, `outcomes.jsonl` (un esito per teacher e caso, con token,
+costo e `margin` se il provider dà i logprob), `report.json`, `summary.md` (da incollare nell'issue),
 `reasoning-review-<teacher>.csv` (30 ragionamenti per teacher, concordi e
 discordi con la label, colonne `reasoning_ok` e `notes` per la revisione
 umana), `relabel-spotcheck.csv`.

@@ -143,7 +143,11 @@ testo non verificati) non sono indicizzati e `dedup-report.json` li elenca in
 ## Spot-check umano
 
 `spotcheck-export` sceglie per hash seminato 300 item `it` dal pool deduplicato
-(fallisce se sono meno) e scrive `spotcheck.csv` nel lotto, in UTF-8:
+(`--n`, minimo della specifica; fallisce se sono meno) e, **in più**, gli item
+`mixed` nella stessa proporzione del pool, `ceil(n · misti / italiani)`: con un
+pool 40/20 IT/misto sono 150 misti, 450 righe in tutto. I misti entrano nel mix
+con il lotto, quindi passano dallo stesso madrelingua. Scrive `spotcheck.csv`
+nel lotto, in UTF-8, con italiani e misti mescolati:
 
 | colonna | contenuto |
 |---|---|
@@ -159,15 +163,24 @@ Un item è `correct` solo se il testo è italiano naturale e comprensibile per u
 madrelingua (per una traduzione: nessun errore di senso evidente) **e** il
 verdetto proposto è giusto per il criterio. Altrimenti `incorrect`.
 
+Il primo export di un pool si registra in `spotcheck-exports.jsonl` (seme,
+righe per lingua, hash di pool e foglio, ora UTC). Rieseguire l'export con lo
+stesso seme riscrive lo stesso foglio; un altro `--seed` o un altro `--n` sullo
+stesso pool si rifiuta, così il campione non si sceglie rieseguendo l'export.
+Solo un pool cambiato ammette un nuovo export.
+
 `spotcheck-import --review FILE --by NOME` rifiuta un foglio con item mancanti,
-estranei o senza `judgement`, poi registra in `spotcheck-outcomes.jsonl` chi,
-quando (UTC), corretti, accuratezza, soglia (`--threshold`, default 0,95),
-esito e gli item `incorrect` con le note. L'esito è legato all'hash del pool:
-se il pool cambia serve un nuovo campione. Un lotto respinto (accuratezza sotto
-la soglia, cioè meno di 285 su 300) resta respinto: niente nuovo campione e
-niente mix; si rifà un lotto in una nuova cartella. Il campione è solo
-italiano; i casi misti dello stesso lotto entrano o restano fuori insieme agli
-italiani.
+estranei o senza `judgement` e un campione che non coincide con l'export
+registrato (meta modificato, registro assente, item diversi da quelli che il
+seme dà sul pool), poi registra in `spotcheck-outcomes.jsonl` chi, quando (UTC),
+corretti, accuratezza complessiva e per lingua (`by_language`), seme e ora
+dell'export, soglia, esito e gli item `incorrect` con le note. La soglia è 0,95
+(specifica #7): `--threshold` la può alzare, mai abbassare. Il lotto è
+accettato solo se **italiani e misti, ciascuno**, sono almeno alla soglia
+(almeno 285 su 300 italiani e, con 150 misti, 143 su 150). L'esito è legato
+all'hash del pool: se il pool cambia serve un nuovo campione. Un lotto respinto
+resta respinto: niente nuovo campione e niente mix; si rifà un lotto in una
+nuova cartella.
 
 ## Mix
 
@@ -226,7 +239,8 @@ deduplica, almeno 0,4·n casi italiani e 0,2·n misti.
 Nel lotto: `plan.jsonl`, `plan-meta.json`, `results.jsonl` (per item: esito,
 motivo, caso, provenienza, chiamate con token e costo), `pool.jsonl`,
 `dedup-report.json`, `ATTRIBUTIONS-it.md`, `spotcheck.csv`,
-`spotcheck-meta.json`, `spotcheck-outcomes.jsonl`. Nel registro della spesa:
+`spotcheck-meta.json`, `spotcheck-exports.jsonl`, `spotcheck-outcomes.jsonl`.
+Nel registro della spesa:
 `authorisation` e `call` della run. `run` stampa i conteggi di accettati per
 origine e lingua e di rifiutati per tipo e motivo.
 

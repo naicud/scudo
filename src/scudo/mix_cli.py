@@ -22,7 +22,7 @@ from pathlib import Path
 from scudo import mix_clean, pilot
 from scudo.artifacts import file_sha256
 from scudo.budget import BudgetError, Ledger, require_volume_confirmation
-from scudo.difficulty import read_outcomes
+from scudo.difficulty import MARGIN_THRESHOLD, read_outcomes
 from scudo.ingest import REPO_ROOT, check_outside_repo
 from scudo.mix import DEFAULT_CATEGORIES, DEFAULT_LANGUAGES, MixError, Targets, build
 from scudo.mix_pool import PoolError, load_ingest, load_italian
@@ -83,13 +83,15 @@ def judge(out: Path, teachers: Path, ledger_path: Path, confirm: str | None) -> 
 
 
 def build_mix(ingest: Path, italian: list[Path], outcomes: list[Path], out: Path, *,
-              targets: Targets, seed: int, override_reason: str | None, sha: str) -> dict:
+              targets: Targets, seed: int, override_reason: str | None, sha: str,
+              margin_threshold: float = MARGIN_THRESHOLD) -> dict:
     """Scrive mix e manifest del mix; un override dei target senza motivo è rifiutato."""
     if targets.overrides() and not (override_reason or "").strip():
         raise MixError(f"target diversi dai default {sorted(targets.overrides())}: "
                        "serve --override-reason")
     cases, inputs = candidates(ingest, italian)
-    rows, stats = build(cases, outcomes=read_outcomes(outcomes), targets=targets, seed=seed)
+    rows, stats = build(cases, outcomes=read_outcomes(outcomes), targets=targets, seed=seed,
+                        margin_threshold=margin_threshold)
     out = check_outside_repo(out)
     out.mkdir(parents=True, exist_ok=True)
     with (out / MIX_FILE).open("w", encoding="utf-8") as handle:
@@ -160,6 +162,8 @@ def main(argv: list[str] | None = None) -> int:
     mix.add_argument("--insufficient-share", type=float, default=Targets().insufficient_share)
     mix.add_argument("--method-cap", type=float, default=Targets().method_cap)
     mix.add_argument("--override-reason", default=None)
+    mix.add_argument("--margin-threshold", type=float, default=MARGIN_THRESHOLD,
+                     help="margine del teacher (nat) sotto cui un caso concorde è HARD")
     up = commands.add_parser("upload")
     up.add_argument("--out", required=True, type=Path)
     up.add_argument("--repo", required=True)
@@ -177,7 +181,8 @@ def main(argv: list[str] | None = None) -> int:
                               method_cap=args.method_cap)
             manifest = build_mix(args.ingest, args.italian, args.outcomes, args.out,
                                  targets=targets, seed=args.seed,
-                                 override_reason=args.override_reason, sha=repo_sha())
+                                 override_reason=args.override_reason, sha=repo_sha(),
+                                 margin_threshold=args.margin_threshold)
             result = {"output": manifest["output"], "overrides": manifest["overrides"],
                       "composition": manifest["composition"]}
         else:

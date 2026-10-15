@@ -212,6 +212,34 @@ def build_report(
     }
 
 
+def shared_cases(
+    left: Sequence[EvalResult], right: Sequence[EvalResult]
+) -> tuple[list[EvalResult], list[EvalResult], dict]:
+    """Due run ristretti ai case_id comuni, nello stesso ordine, per confrontarli sugli stessi casi.
+
+    Un modello (es. l'Accurate su `benchmarks.sample`) può aver visto solo una parte
+    dei casi dell'altro: i report si costruiscono su queste liste. Rifiuta case_id
+    duplicati e casi comuni con gold, lingua o superficie diversi.
+    """
+    by_side = []
+    for side in (left, right):
+        index = {item.case_id: item for item in side}
+        if len(index) != len(side):
+            raise ValueError("case_id duplicati in un run")
+        by_side.append(index)
+    a, b = by_side
+    shared = sorted(set(a) & set(b))
+    if not shared:
+        raise ValueError("nessun caso in comune fra i due run")
+    for case_id in shared:
+        if (a[case_id].gold, a[case_id].language, a[case_id].surface) != (
+                b[case_id].gold, b[case_id].language, b[case_id].surface):
+            raise ValueError(f"{case_id}: gold, lingua o superficie diversi fra i due run")
+    info = {"shared": len(shared), "only_left": len(a) - len(shared),
+            "only_right": len(b) - len(shared)}
+    return [a[c] for c in shared], [b[c] for c in shared], info
+
+
 def compare_readouts(
     local: dict[str, Readout], live: dict[str, Readout], *, tolerance: float
 ) -> dict:

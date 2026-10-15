@@ -139,6 +139,23 @@ def test_request_extra_is_merged_into_the_body():
     assert transport.calls[0][2]["reasoning_effort"] == "medium"
 
 
+def test_verdict_margin_comes_from_the_returned_logprobs():
+    content = '{"verdict": "NO_VIOLATION", "reasoning": "Bread."}'
+    tokens = [('{"verdict": "', -0.01, []), ("NO", -0.2, [("VI", -1.7), ("IN", -3.0)]),
+              ('_VIOLATION", "reasoning": "Bread."}', -0.01, [])]
+    data = json.loads(body(content))
+    data["choices"][0]["logprobs"] = {"content": [
+        {"token": t, "logprob": lp, "top_logprobs": [{"token": t, "logprob": lp}]
+         + [{"token": a, "logprob": b} for a, b in alts]} for t, lp, alts in tokens]}
+    judge, transport, _ = client((200, json.dumps(data).encode()),
+                                 request_extra={"logprobs": True, "top_logprobs": 5})
+    outcome = judge.judge(MESSAGES)
+    assert outcome.status == "ok" and outcome.margin == pytest.approx(1.5)
+    assert transport.calls[0][2]["logprobs"] is True and transport.calls[0][2]["top_logprobs"] == 5
+    plain, _, _ = client((200, body()))
+    assert plain.judge(MESSAGES).margin is None  # provider senza logprob: nessun margine
+
+
 def test_missing_key_refuses_before_any_call():
     with pytest.raises(ConfigError, match="SCUDO_TEST_KEY"):
         Client(config(), transport=FakeTransport(), environ={})

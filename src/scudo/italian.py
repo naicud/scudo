@@ -75,7 +75,8 @@ def _parser() -> argparse.ArgumentParser:
     review.add_argument("--out", required=True, type=Path)
     review.add_argument("--review", required=True, type=Path)
     review.add_argument("--by", required=True)
-    review.add_argument("--threshold", type=float, default=spotcheck_it.THRESHOLD)
+    review.add_argument("--threshold", type=float, default=spotcheck_it.THRESHOLD,
+                        help="si alza, mai sotto 0,95")
     mix = commands.add_parser("mix", help="mix per lingua")
     mix.add_argument("--dest", required=True, type=Path)
     mix.add_argument("--cases", type=Path, nargs="*", default=[])

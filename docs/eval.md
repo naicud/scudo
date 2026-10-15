@@ -45,6 +45,12 @@ i report si confrontano campo per campo; una baseline non ha `token_cost`.
 Ogni caso costa una generazione: il notebook dell'Accurate valuta un campione
 deterministico per benchmark (`benchmarks.sample`, chiave SHA-256 di seme e
 case_id) e lo dichiara in `benchmark.sample` (`cases`, `of`, `seed`).
+Il confronto con il Fast o con una baseline vale solo sugli stessi casi:
+`eval_report.shared_cases(a, b)` restringe due run (liste di `EvalResult`) ai
+case_id comuni, nello stesso ordine, rifiuta case_id duplicati e casi comuni con
+gold, lingua o superficie diversi, e conta `shared`, `only_left`, `only_right`;
+i due report si costruiscono su quelle liste. Con lo stesso seme e la stessa
+dimensione, `benchmarks.sample` dà gli stessi casi in ogni notebook.
 
 ## Metriche
 

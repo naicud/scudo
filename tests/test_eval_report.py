@@ -5,7 +5,7 @@ import pytest
 
 from scudo.artifacts import ArtifactIdentity
 from scudo.baselines import LabelReadout
-from scudo.eval_report import EvalResult, build_report, token_cost
+from scudo.eval_report import EvalResult, build_report, shared_cases, token_cost
 from scudo.protocol import FORMAT_VERSION, read_options
 
 CANON = ("VIOLATION", "NO_VIOLATION", "INSUFFICIENT")
@@ -266,3 +266,25 @@ def test_token_cost_uses_nearest_rank_percentiles_and_counts_budget_hits():
 def test_token_cost_rejects_invalid_counts(generated, budget):
     with pytest.raises(ValueError):
         token_cost(generated, budget=budget)
+
+
+def test_two_runs_are_compared_only_on_their_shared_cases():
+    a, b, c = (result("en", "VIOLATION", "VIOLATION", surface=s)
+               for s in ("prompt", "response", "over_refusal"))
+    wrong = result("en", "VIOLATION", "NO_VIOLATION")  # solo nella baseline
+    fast, baseline = [b, a], [c, a, wrong, b]
+    left, right, info = shared_cases(fast, baseline)
+    assert [r.case_id for r in left] == [r.case_id for r in right] == sorted([a.case_id, b.case_id])
+    assert info == {"shared": 2, "only_left": 0, "only_right": 2}
+    assert build(left)["overall"] == build(right)["overall"]  # il caso in più non pesa
+
+
+def test_shared_cases_refuse_mismatched_or_duplicated_cases():
+    a = result("en", "VIOLATION", "VIOLATION")
+    other_gold = EvalResult(a.case_id, "en", "prompt", "NO_VIOLATION", a.readout)
+    with pytest.raises(ValueError, match="gold"):
+        shared_cases([a], [other_gold])
+    with pytest.raises(ValueError, match="duplicat"):
+        shared_cases([a, a], [a])
+    with pytest.raises(ValueError, match="nessun caso"):
+        shared_cases([a], [result("it", "VIOLATION", "VIOLATION")])
