@@ -126,13 +126,15 @@ origine.
   report viene dal manifest attuale (stesso digest) e ogni fonte è ancora ammessa
   dal cancello; il numero di casi deve coincidere con il report;
 - lotti italiani di #7 (`--italian DIR`, ripetibile): solo con lo spot-check
-  umano accettato per il pool attuale (`scudo.language_mix.batch_pool`, vedi
-  [`italian-data.md`](italian-data.md)). Un caso tradotto resta della voce della
-  sua fonte, che deve essere ammessa dal cancello; un caso generato (IT o misto)
-  è della voce `teacher-generated`. Origine sconosciuta o fonte diversa dalla voce
-  sono errori. Il mix per lingua di #7 (`python -m scudo.italian mix`) resta per
-  chi vuole solo la quota per lingua; il Fast v0.1 usa questo mix, che applica la
-  lingua dentro ogni categoria.
+  umano accettato per il pool attuale (`scudo.mix_pool.batch_pool`, vedi
+  [`italian-data.md`](italian-data.md#ingresso-nel-mix)), e solo se ogni testo è
+  scritto da un teacher del registro con la sua voce del manifest ammessa dal
+  cancello alla stessa revisione (`teacher-gpt-oss-120b`,
+  `teacher-qwen3.5-397b-a17b`). Un caso tradotto resta della voce della sua
+  fonte, che deve essere ammessa; un caso generato (IT o misto) è della voce del
+  teacher che lo ha scritto. Origine sconosciuta, modello fuori dal registro o
+  fonte diversa dalla voce sono errori. È l'unico mix: non c'è un mix per lingua a
+  parte, e la lingua si applica dentro ogni categoria.
 
 ## Manifest del mix
 

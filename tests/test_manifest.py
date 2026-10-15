@@ -135,6 +135,17 @@ def test_every_converted_training_source_is_in_the_manifest():
     assert set(UNCONVERTED) <= trained
 
 
+def test_every_registered_teacher_has_a_training_entry_with_its_revision_and_card():
+    from scudo.teacher import CANDIDATES
+
+    for model_id, candidate in CANDIDATES.items():
+        (entry,) = [e for e in training() if e.id == model_id]
+        assert entry.revision == candidate.revision and entry.license == candidate.license
+        assert UNCONVERTED[model_id]
+        # Data card completa: l'unico blocco ammesso è la decisione umana sui termini.
+        assert [p for p in problems([entry]) if "INCERTO" not in p] == []
+
+
 def test_open_jev_passes_the_gate_once_its_procedural_teacher_is_verified():
     assert not [p for p in problems(load()) if p.startswith("open-jev-train:")]
 

@@ -11,7 +11,8 @@ def item(i, language="it"):
     return {"key": f"k{i}", "origin": "generated", "source": "scudo/teacher-generated",
             "source_id": f"s{i}", "language": language, "surface": "prompt",
             "criterion": "Is it unsafe?", "evidence": f"Testo numero {i}\ncon a capo",
-            "verdict": "VIOLATION", "provenance": {"generator": {"model_id": "m"}}}
+            "verdict": "VIOLATION",
+            "provenance": {"kind": "generated", "generator": {"model_id": "openai/gpt-oss-120b"}}}
 
 
 def pool(tmp_path, n_it=30, n_mixed=1):

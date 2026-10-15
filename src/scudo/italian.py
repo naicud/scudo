@@ -1,4 +1,4 @@
-"""Dati italiani (issue #7): traduzione, generazione nativa e mista, spot-check, mix.
+"""Dati italiani (issue #7): traduzione, generazione nativa e mista, spot-check.
 
 Comandi (`python -m scudo.italian ...`, cartelle e file sempre fuori dal repository):
 
@@ -10,11 +10,11 @@ Comandi (`python -m scudo.italian ...`, cartelle e file sempre fuori dal reposit
   teacher (`python -m scudo.pilot confirm-volume`), con X uguale alla stima e
   nel residuo; si ferma prima di superare X; riprende saltando gli item fatti;
 - `dedup`: deduplica i casi accettati contro i benchmark (extra `train`);
-- `spotcheck-export` / `spotcheck-import`: campione per il madrelingua ed esito;
-- `mix`: mix per lingua, default 40/40/20 IT/EN/misto.
+- `spotcheck-export` / `spotcheck-import`: campione per il madrelingua ed esito.
 
-Moduli: `scudo.translate`, `scudo.generate_it`, `scudo.italian_run`,
-`scudo.spotcheck_it`, `scudo.language_mix`. Guida: `docs/italian-data.md`.
+Un lotto accettato entra nel mix del Fast con `python -m scudo.mix_cli --italian`
+(`scudo.mix_pool`). Moduli: `scudo.translate`, `scudo.generate_it`,
+`scudo.italian_run`, `scudo.spotcheck_it`. Guida: `docs/italian-data.md`.
 """
 
 import argparse
@@ -23,7 +23,7 @@ import sys
 from functools import partial
 from pathlib import Path
 
-from scudo import italian_run, language_mix, spotcheck_it
+from scudo import italian_run, spotcheck_it
 from scudo.budget import BudgetError, Ledger
 from scudo.ingest import check_outside_repo, load_rows
 from scudo.manifest import load
@@ -77,26 +77,7 @@ def _parser() -> argparse.ArgumentParser:
     review.add_argument("--by", required=True)
     review.add_argument("--threshold", type=float, default=spotcheck_it.THRESHOLD,
                         help="si alza, mai sotto 0,95")
-    mix = commands.add_parser("mix", help="mix per lingua")
-    mix.add_argument("--dest", required=True, type=Path)
-    mix.add_argument("--cases", type=Path, nargs="*", default=[])
-    mix.add_argument("--batch", type=Path, nargs="*", default=[], help="lotti italiani")
-    mix.add_argument("--n", required=True, type=int)
-    mix.add_argument("--shares", default="it=0.4,en=0.4,mixed=0.2")
-    mix.add_argument("--seed", type=int, default=0)
     return parser
-
-
-def _mix(args) -> dict:
-    records, excluded = language_mix.dataset_pool(_read_cases(args.cases), load())
-    for batch in args.batch:
-        records += language_mix.batch_pool(batch)
-    mix, meta = language_mix.build_mix(language_mix.pools_by_language(records), args.n,
-                                       language_mix.parse_shares(args.shares), seed=args.seed)
-    meta["excluded"] = excluded
-    meta["batches"] = [str(check_outside_repo(b)) for b in args.batch]
-    language_mix.write_mix(args.dest, mix, meta)
-    return meta
 
 
 def _dump(data) -> None:
@@ -124,12 +105,10 @@ def main(argv: list[str] | None = None) -> int:
             _dump(italian_run.dedup(out, load(), partial(load_rows, cache_dir=out / "hf-cache")))
         elif args.command == "spotcheck-export":
             print(spotcheck_it.export(args.out, n=args.n, seed=args.seed))
-        elif args.command == "spotcheck-import":
+        else:
             outcome = spotcheck_it.import_review(args.out, args.review, by=args.by,
                                                  threshold=args.threshold)
             _dump({k: v for k, v in outcome.items() if k != "incorrect_items"})
-        else:
-            _dump(_mix(args))
     except (BudgetError, ConfigError, ValueError) as error:
         print(error, file=sys.stderr)
         return 1

@@ -234,7 +234,12 @@ Note:
 - **`JAILBREAK_ATTEMPT`** è un criterio nostro, scritto sulla definizione di
   `jailbreaking` di ToxicChat (paper §2.1: l'utente cerca deliberatamente di
   ingannare il chatbot perché generi contenuto tossico, con testo in apparenza
-  innocuo). Chiedere direttamente contenuti vietati non è jailbreak.
+  innocuo). Chiedere direttamente contenuti vietati non è jailbreak. Non è il
+  criterio di default `injection.direct`, che il training usa: quello vale anche
+  per chi cerca di farsi rivelare le istruzioni nascoste senza puntare a
+  contenuti vietati, fuori dalla definizione di ToxicChat. Con il criterio di
+  training si misurerebbe una domanda diversa da quella delle label; resta solo
+  valutazione.
 - Senza colonna id (XSTest-IT, OR-Bench) la riga è `<split>:<posizione>`; JBB
   usa `<split>:<Index>`. L'id del caso è `<benchmark>:<riga>:<superficie>:<lingua>`.
 

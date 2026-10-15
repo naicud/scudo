@@ -41,6 +41,7 @@ from scudo import (
 from scudo.cases import Case
 from scudo.dedup import BANDS, BINS, ROWS, SHINGLE, THRESHOLD, Index
 from scudo.manifest import MANIFEST, Entry, ManifestError, benchmarks, gate, load, training
+from scudo.teacher import CANDIDATES
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 # Un convertitore espone needs_relabel e drop_reason con cases_from_row, oppure
@@ -59,6 +60,9 @@ UNCONVERTED = {
         "l'unico esito (password rivelata) viene dalle risposte ChatGPT escluse"),
     "nvidia/Nemotron-Content-Safety-Reasoning-Dataset": (
         "righe con ragionamento dell'Accurate, non casi: python -m scudo.reasoning_data build"),
+    **{model_id: ("testi del teacher, non sul Hub: entrano dai lotti italiani "
+                  "(scudo.mix_cli --italian) e dai file --extra di scudo.reasoning_data")
+       for model_id in CANDIDATES},
 }
 Loader = Callable[[Entry, str], Iterable[dict]]
 DEDUP_PARAMS = {"normalize": "NFKC+casefold+punteggiatura", "exact": "sha256",

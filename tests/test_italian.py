@@ -1,4 +1,7 @@
+import importlib.util
 import json
+
+import pytest
 
 from scudo import italian
 from test_italian_run import ENTRIES, RECORDS
@@ -46,12 +49,8 @@ def test_unknown_teacher_and_inside_repo_output_exit_with_an_error(tmp_path, cap
                          str(tmp_path / "l.jsonl")]) == 1
 
 
-def test_mix_from_dataset_cases_writes_outside_the_repository(tmp_path, monkeypatch):
-    monkeypatch.setattr(italian, "load", lambda: ENTRIES)
-    cases = write_jsonl(tmp_path / "c.jsonl", RECORDS)
-    dest = tmp_path / "mix"
-    assert italian.main(["mix", "--dest", str(dest), "--cases", str(cases), "--n", "4",
-                         "--shares", "en=1"]) == 0
-    assert len((dest / "mix.jsonl").read_text().splitlines()) == 4
-    # Con le quote di default mancano IT e misto: il mix fallisce, non riempie con l'inglese.
-    assert italian.main(["mix", "--dest", str(dest), "--cases", str(cases), "--n", "4"]) == 1
+def test_there_is_no_side_door_mix_the_fast_mix_is_scudo_mix_cli(tmp_path, capsys):
+    with pytest.raises(SystemExit):
+        italian.main(["mix", "--dest", str(tmp_path / "mix"), "--n", "4"])
+    assert "invalid choice" in capsys.readouterr().err
+    assert importlib.util.find_spec("scudo.language_mix") is None

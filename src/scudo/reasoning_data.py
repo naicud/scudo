@@ -11,9 +11,17 @@ La traccia giudica insieme richiesta e risposta, mentre l'evidenza di un caso
 superficie `prompt`. Il verdetto della traccia è la riga finale
 `Prompt harm: harmful|unharmful` dopo `</think>`; una traccia illeggibile esce
 con il suo motivo, una che non coincide con la label gold esce come
-`disagree`. Ogni riga porta fonte, id e generatore della traccia. I file
-`--extra` (ragionamenti del teacher, issue #7) hanno lo stesso formato di
-`ReasoningRecord` e passano gli stessi controlli. Tutto si deduplica contro i
+`disagree`. Gold è solo la label del prompt scritta da umani
+(`prompt_label_source = human`). Ogni riga porta fonte, id e generatore della
+traccia.
+
+I file `--extra` (ragionamenti del teacher, issue #7) hanno il formato di
+`ReasoningRecord`. Un record entra solo se il generatore è un teacher del
+registro con la propria voce ammessa (`mix_pool.teacher_problem`) e se il caso
+d'origine, cercato fra i casi della build e dei lotti italiani (`--ingest`,
+`--italian`, letti da `scudo.mix_pool`), è gold, di una voce ammessa e con lo
+stesso verdetto: il verdetto del record non vale da solo. Gli scarti si contano
+per motivo, poi gli stessi controlli di Nemotron. Tutto si deduplica contro i
 benchmark del manifest. `python -m scudo.reasoning_data build --out DIR`
 scrive `reasoning.jsonl` e `reasoning-report.json` fuori dal repository.
 """
@@ -34,7 +42,8 @@ from scudo.artifacts import file_sha256
 from scudo.cases import Case
 from scudo.dedup import Index
 from scudo.ingest import DEDUP_PARAMS, benchmark_index, check_outside_repo, load_rows, manifest_digest
-from scudo.manifest import Entry, ManifestError, benchmarks, gate, load, training
+from scudo.manifest import Entry, ManifestError, benchmarks, gate, load, problems, training
+from scudo.mix_pool import PoolCase, load_ingest, load_italian, teacher_problem
 from scudo.protocol import SEMANTIC_IDS
 from scudo.reasoned import REASONED_FORMAT_VERSION, check_reasoning, reasoned_training_row
 
@@ -111,6 +120,8 @@ def drop_reason(row: dict) -> str | None:
     """Motivo per cui la riga resta fuori, o None se entra."""
     if reason := aegis.drop_reason(row):
         return reason
+    if row.get("prompt_label_source") != "human":
+        return "label del prompt non umana"
     response = row.get("response")
     if isinstance(response, str) and response not in ("", "None"):
         return "traccia congiunta su prompt e risposta"
@@ -142,6 +153,51 @@ def read_records(path: Path) -> Iterator[ReasoningRecord]:
                 yield ReasoningRecord(**json.loads(line))
             except (ValueError, TypeError) as error:
                 raise ValueError(f"{Path(path).name}:{number}: {error}") from None
+
+
+_CONFLICT = object()
+
+
+def _key(case: Case) -> tuple:
+    return (case.source, case.source_id, case.language, case.surface, case.criterion,
+            case.evidence)
+
+
+def source_index(cases: Iterable[PoolCase]) -> dict:
+    """Casi d'origine per chiave senza verdetto; verdetti diversi sullo stesso caso: conflitto."""
+    out: dict = {}
+    for pooled in cases:
+        key = _key(pooled.case)
+        known = out.get(key)
+        out[key] = pooled if known is None or (
+            known is not _CONFLICT and known.case.verdict == pooled.case.verdict) else _CONFLICT
+    return out
+
+
+def extra_problem(item: ReasoningRecord, entries: list[Entry], sources: dict) -> str | None:
+    """Perché un record `--extra` resta fuori, o None: teacher, fonte e verdetto verificati."""
+    if reason := teacher_problem(entries, item.generator):
+        return reason
+    found = sources.get(_key(item.case()))
+    if found is None:
+        return "source_case_missing"
+    if found is _CONFLICT:
+        return "source_case_conflict"
+    entry = [e for e in training(entries) if e.name == found.entry]
+    if len(entry) != 1 or problems(entry):
+        return "source_blocked"
+    if found.needs_relabel:
+        return "source_label_not_gold"
+    return "verdict_differs_from_source" if found.case.verdict != item.verdict else None
+
+
+def _admit(records: Iterable[ReasoningRecord], entries: list[Entry], sources: dict,
+           stats: dict) -> Iterator[ReasoningRecord]:
+    for item in records:
+        if reason := extra_problem(item, entries, sources):
+            stats["rejected"][reason] += 1
+        else:
+            yield item
 
 
 def load_traces(entry: Entry, *, cache_dir: Path) -> Iterator[dict]:
@@ -199,10 +255,14 @@ def _plain(stats: dict) -> dict:
             for key, value in stats.items()}
 
 
-def build(out: Path, *, extra: Sequence[Path] = (), seed: int = SEED,
+def build(out: Path, *, extra: Sequence[Path] = (), cases: Sequence[PoolCase] = (),
+          inputs: dict | None = None, seed: int = SEED,
           entries: list[Entry] | None = None, loader=None,
           trace_loader: Callable[[Entry], Iterable[dict]] | None = None) -> dict:
-    """Cancello, controllo dell'uscita e della revisione prima di ogni download."""
+    """Cancello, controllo dell'uscita e della revisione prima di ogni download.
+
+    `cases` sono i casi d'origine dei record `--extra` (da `scudo.mix_pool`), `inputs`
+    la loro provenienza, copiata nel report."""
     digest = None if entries is not None else manifest_digest()
     entries = load() if entries is None else entries
     gate(entries)
@@ -224,7 +284,8 @@ def build(out: Path, *, extra: Sequence[Path] = (), seed: int = SEED,
               "benchmarks": {bench.name: {"texts": index.sizes.get(bench.name, 0),
                                           "removed_exact": 0, "removed_near": 0}
                              for bench in benchmarks(entries)},
-              "sources": {}}
+              "sources": {}, "source_cases": {"cases": len(cases), "inputs": inputs or {}}}
+    sources = source_index(cases)
     with (out / "reasoning.jsonl").open("w", encoding="utf-8") as handle:
         stats = {"revision": entry.revision, "file": FILE, "rows": 0, "dropped": Counter(),
                  "traces": 0, "trace_dropped": Counter(), **_stats()}
@@ -232,8 +293,9 @@ def build(out: Path, *, extra: Sequence[Path] = (), seed: int = SEED,
         report["sources"][entry.name] = _plain(stats)
         for path in extra:
             records = list(read_records(path))
-            stats = {"sha256": file_sha256(Path(path)), "records": len(records), **_stats()}
-            _keep(records, index, stats, rng, handle)
+            stats = {"sha256": file_sha256(Path(path)), "records": len(records),
+                     "rejected": Counter(), **_stats()}
+            _keep(_admit(records, entries, sources, stats), index, stats, rng, handle)
             report["sources"][f"extra:{Path(path).name}"] = _plain(stats)
     for stats in report["sources"].values():
         for kind in ("exact", "near"):
@@ -244,6 +306,17 @@ def build(out: Path, *, extra: Sequence[Path] = (), seed: int = SEED,
     return report
 
 
+def _sources(ingest: Path | None, italian: Sequence[Path]) -> tuple[list[PoolCase], dict]:
+    cases, inputs = [], {"ingest": None, "italian": []}
+    if ingest is not None:
+        cases, inputs["ingest"] = load_ingest(ingest)
+    for batch in italian:
+        found, info = load_italian(batch)
+        cases += found
+        inputs["italian"].append(info)
+    return cases, inputs
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(prog="python -m scudo.reasoning_data",
                                      description=__doc__.split("\n")[0])
@@ -252,10 +325,14 @@ def main(argv: list[str] | None = None) -> int:
     command.add_argument("--out", required=True, type=Path)
     command.add_argument("--extra", action="append", default=[], type=Path,
                          help="JSONL di ReasoningRecord (ragionamenti del teacher)")
+    command.add_argument("--ingest", type=Path, help="build di scudo.ingest: casi d'origine")
+    command.add_argument("--italian", action="append", default=[], type=Path,
+                         help="lotto di #7 con spot-check accettato: casi d'origine")
     command.add_argument("--seed", type=int, default=SEED)
     args = parser.parse_args(argv)
     try:
-        report = build(args.out, extra=args.extra, seed=args.seed)
+        cases, inputs = _sources(args.ingest, args.italian)
+        report = build(args.out, extra=args.extra, cases=cases, inputs=inputs, seed=args.seed)
     except (ManifestError, ValueError) as error:
         print(error, file=sys.stderr)
         return 1

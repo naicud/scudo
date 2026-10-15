@@ -13,7 +13,8 @@ from scudo import italian_run, mix_cli, pilot, spotcheck_it
 from scudo.budget import BudgetError, Ledger, confirm_volume
 from scudo.mix import MixError, Targets
 from scudo.spotcheck_it import SpotCheckError
-from scudo.mix_pool import GENERATED_ENTRY, PoolError, load_ingest, load_italian
+from scudo.mix_pool import PoolError, batch_pool, load_ingest, load_italian
+from scudo.teacher import CANDIDATES
 from test_manifest import TRAIN
 from test_mix import EN_ONLY, judged, pool
 from test_pilot import toml
@@ -22,6 +23,9 @@ from scudo.teacher import load_configs
 from test_teacher import CONFIG
 
 DIGEST = "a" * 64
+GPT = "openai/gpt-oss-120b"
+TEACHER = replace(TRAIN, name="teacher-gpt-oss", id=GPT, revision=CANDIDATES[GPT].revision,
+                  splits=("generated", "translated", "reasoning"), license="apache-2.0")
 
 
 def entries_for(cases):
@@ -77,24 +81,53 @@ def italian_batch(tmp_path, records, *, accept=True):
     return out
 
 
-def translated(i):
+def translated(i, model=GPT):
     return {**item(i), "key": f"tr:harm:{i}:prompt", "origin": "translated", "source": "org/harm",
-            "source_id": f"{i}#it", "provenance": {"kind": "translated", "entry": "harm"}}
+            "source_id": f"{i}#it", "provenance": {"kind": "translated", "entry": "harm",
+                                                   "translator": {"model_id": model}}}
 
 
 def test_italian_batch_enters_only_with_an_accepted_spot_check(tmp_path):
-    entries = entries_for(pool(1))
+    entries = entries_for(pool(1)) + [TEACHER]
     records = [item(i) for i in range(25)] + [translated(i) for i in range(5)]
     with pytest.raises(SpotCheckError):
         load_italian(italian_batch(tmp_path / "a", records, accept=False), entries=entries)
-    loaded, info = load_italian(italian_batch(tmp_path / "b", records), entries=entries)
-    assert Counter(p.entry for p in loaded) == {GENERATED_ENTRY: 25, "harm": 5}
+    with pytest.raises(SpotCheckError):
+        batch_pool(tmp_path / "a" / "it-batch")
+    assert len(batch_pool(italian_batch(tmp_path / "b", records))) == 30
+    loaded, info = load_italian(tmp_path / "b" / "it-batch", entries=entries)
+    assert Counter(p.entry for p in loaded) == {"teacher-gpt-oss": 25, "harm": 5}
     assert info["pool_sha256"] == info["spotcheck_pool_sha256"]
     assert info["by_origin_language"] == {"generated/it": 25, "translated/it": 5}
 
 
+@pytest.mark.parametrize(("entries", "match"), [
+    ([], "teacher_not_in_manifest"),
+    ([replace(TEACHER, generator_terms="INCERTO")], "teacher_blocked"),
+    ([replace(TEACHER, revision="0" * 40)], "teacher_revision_differs"),
+])
+def test_teacher_text_enters_only_through_an_admitted_teacher_entry(tmp_path, entries, match):
+    entries = entries_for(pool(1)) + entries
+    for name, records in (("gen", [item(i) for i in range(25)]),
+                          ("tr", [translated(i) for i in range(25)])):
+        with pytest.raises(PoolError, match=match):
+            load_italian(italian_batch(tmp_path / name, records), entries=entries)
+
+
+def test_text_from_a_model_outside_the_teacher_registry_is_refused(tmp_path):
+    entries = entries_for(pool(1)) + [TEACHER]
+    llama = [{**item(i), "provenance": {"kind": "generated",
+                                        "generator": {"model_id": "meta-llama/Llama-3.1-70B"}}}
+             for i in range(25)]
+    with pytest.raises(PoolError, match="generator_not_teacher"):
+        load_italian(italian_batch(tmp_path / "g", llama), entries=entries)
+    with pytest.raises(PoolError, match="generator_not_teacher"):
+        load_italian(italian_batch(tmp_path / "t", [translated(i, "org/other") for i in range(25)]),
+                     entries=entries)
+
+
 def test_translated_case_from_a_blocked_or_other_source_is_refused(tmp_path):
-    entries = entries_for(pool(1))
+    entries = entries_for(pool(1)) + [TEACHER]
     records = [item(i) for i in range(25)] + [translated(1)]
     batch = italian_batch(tmp_path, records)
     blocked = [replace(e, generator_terms="INCERTO") if e.name == "harm" else e for e in entries]

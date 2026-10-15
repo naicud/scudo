@@ -5,7 +5,7 @@ import pytest
 
 from scudo import generate_it, teacher
 from scudo.cases import SURFACES
-from scudo.default_criteria import by_id
+from scudo.default_criteria import INJECTION_DIRECT, INJECTION_INDIRECT, by_id
 from scudo.teacher_client import Outcome
 from test_translate import TRANSLATOR, Script, text, verdict
 
@@ -26,13 +26,15 @@ def test_tasks_are_deterministic_and_cover_every_domain_surface_and_target():
     assert {t["language"] for t in tasks} == {"it"}
 
 
-def test_criteria_come_from_the_default_set_or_the_injection_criteria():
+def test_every_criterion_is_a_default_criterion_with_one_wording():
     for task in generate_it.tasks("mixed", 120, seed=0):
-        if task["surface"].startswith("injection"):
-            assert task["criterion"] == generate_it.INJECTION_CRITERIA[task["surface"]]
+        assert task["criterion"] == by_id(task["criterion_id"]).text
+        if task["surface"] == "injection_direct":
+            assert task["criterion_id"] == INJECTION_DIRECT.id
+        elif task["surface"] == "injection_indirect":
+            assert task["criterion_id"] == INJECTION_INDIRECT.id
         else:
             assert task["criterion_id"] in generate_it.DOMAIN_CRITERIA[task["domain"]]
-            assert task["criterion"] == by_id(task["criterion_id"]).text
 
 
 def test_unknown_language_is_refused():

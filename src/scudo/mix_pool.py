@@ -3,27 +3,29 @@
 Dalla build si leggono solo le fonti del suo `report.json`, e solo se il report
 viene dal manifest attuale (stesso digest: la build è passata dal cancello su
 quel manifest) e ogni fonte è ancora ammessa dal cancello. Un lotto italiano
-entra solo con lo spot-check umano accettato (`language_mix.batch_pool`): un
+entra solo con lo spot-check umano accettato (`batch_pool`). Ogni suo testo è
+scritto da un teacher: il modello in provenienza (generatore o traduttore) deve
+essere del registro `scudo.teacher.CANDIDATES` e avere la propria voce di
+training, alla stessa revisione, ammessa dal cancello (`teacher_problem`). Un
 caso tradotto resta della voce della sua fonte, che deve essere ammessa; un caso
-generato è della voce `teacher-generated`. Origine sconosciuta, fonte diversa
-dalla voce o caso invalido sono errori, mai righe saltate.
+generato è della voce del teacher che lo ha scritto. Origine sconosciuta, fonte
+diversa dalla voce o caso invalido sono errori, mai righe saltate.
 """
 
 import json
 from collections import Counter
-from dataclasses import dataclass, fields
+from dataclasses import asdict, dataclass, fields
 from pathlib import Path
 
 from scudo import generate_it, spotcheck_it
 from scudo.artifacts import file_sha256
 from scudo.cases import Case
 from scudo.ingest import manifest_digest
-from scudo.italian_run import POOL
-from scudo.language_mix import batch_pool
-from scudo.manifest import Entry, load, problems
+from scudo.italian_run import POOL, read_pool
+from scudo.manifest import Entry, load, problems, training
+from scudo.teacher import CANDIDATES
 
 _CASE_FIELDS = tuple(f.name for f in fields(Case))
-GENERATED_ENTRY = "teacher-generated"  # casi IT e misti generati e approvati in #7
 
 
 class PoolError(ValueError):
@@ -33,7 +35,7 @@ class PoolError(ValueError):
 @dataclass(frozen=True)
 class PoolCase:
     case: Case
-    entry: str  # voce del manifest, o GENERATED_ENTRY per i casi generati di #7
+    entry: str  # voce del manifest: della fonte, o del teacher per i casi generati
     needs_relabel: bool
 
     @property
@@ -77,6 +79,36 @@ def _admitted(entries: list[Entry], name: str) -> Entry:
     return by_name[name]
 
 
+def teacher_problem(entries: list[Entry], model_id) -> str | None:
+    """Perché i testi di `model_id` non entrano, o None: teacher del registro con voce ammessa."""
+    if not isinstance(model_id, str) or model_id not in CANDIDATES:
+        return "generator_not_teacher"
+    found = [entry for entry in training(entries) if entry.id == model_id]
+    if len(found) != 1:
+        return "teacher_not_in_manifest"
+    if found[0].revision != CANDIDATES[model_id].revision:
+        return "teacher_revision_differs"
+    return "teacher_blocked" if problems(found) else None
+
+
+def _teacher(entries: list[Entry], record: dict) -> Entry:
+    """Voce del teacher che ha scritto il testo del caso: generatore o traduttore."""
+    writer = record["provenance"].get(
+        "translator" if record["origin"] == "translated" else "generator")
+    model_id = writer.get("model_id") if isinstance(writer, dict) else None
+    if problem := teacher_problem(entries, model_id):
+        raise PoolError(f"{record['key']}: testo di {model_id!r}: {problem}")
+    return next(entry for entry in training(entries) if entry.id == model_id)
+
+
+def batch_pool(batch: Path) -> list[dict]:
+    """Pool deduplicato del lotto italiano, solo con spot-check umano accettato."""
+    spotcheck_it.require_accepted(batch)
+    return [{"key": r["key"], "origin": r["origin"],
+             **asdict(Case(**{name: r[name] for name in _CASE_FIELDS})),
+             "provenance": r["provenance"]} for r in read_pool(batch)]
+
+
 def load_ingest(out: Path, *, entries: list[Entry] | None = None,
                 manifest_sha256: str | None = None) -> tuple[list[PoolCase], dict]:
     """Casi della build e provenienza: digest del report, del manifest e di ogni JSONL."""
@@ -112,12 +144,12 @@ def load_italian(batch: Path, *, entries: list[Entry] | None = None
             entry = _admitted(entries, record["provenance"]["entry"])
             if case.source != entry.id:
                 raise PoolError(f"{record['key']}: fonte {case.source!r} diversa da {entry.id!r}")
-            name = entry.name
+            _teacher(entries, record)
         elif record["origin"] == "generated" and case.source == generate_it.SOURCE:
-            name = GENERATED_ENTRY
+            entry = _teacher(entries, record)
         else:
             raise PoolError(f"{record['key']}: origine {record['origin']!r} sconosciuta")
-        pooled = PoolCase(case, name, False)
+        pooled = PoolCase(case, entry.name, False)
         if pooled.key in keys:
             raise PoolError(f"{record['key']}: chiave ripetuta {pooled.key}")
         keys.add(pooled.key)

@@ -3,9 +3,12 @@
 Con il **teacher** scelto nel pilot ([teacher-pilot.md](teacher-pilot.md)) si
 traducono in italiano casi inglesi con label gold, si generano casi nativi
 italiani e misti IT/EN, si deduplica contro i benchmark, un madrelingua
-controlla 300 item e solo allora il lotto entra nel mix 40/40/20 IT/EN/misto.
-Ogni uscita del teacher è candidata: entra solo se la label coincide (accordo
-di label) e se il lotto supera lo spot-check umano.
+controlla 300 item e solo allora il lotto può entrare nel mix del Fast
+(`python -m scudo.mix_cli --italian`, vedi [fast-v01.md](fast-v01.md)), che
+applica le quote 40/40/20 IT/EN/misto dentro ogni categoria. Ogni uscita del
+teacher è candidata: entra solo se la label coincide (accordo di label), se il
+lotto supera lo spot-check umano e se il teacher ha la sua voce ammessa nel
+manifest (vedi [Ingresso nel mix](#ingresso-nel-mix)).
 
 Il codice non spende nulla da solo e non compila nessuna decisione umana. Prima
 di ogni chiamata servono: la conferma del volume registrata dalla persona con
@@ -16,8 +19,8 @@ pilot), e `--confirm-spend` uguale alla stima.
 Moduli: `scudo.translate` (ammissibilità, traduzione, back-translation, accordo
 di label, attribuzioni), `scudo.generate_it` (domini, criteri, generazione e
 validazione separata), `scudo.italian_run` (piano, stima, run, deduplica),
-`scudo.spotcheck_it` (campione ed esito umano), `scudo.language_mix` (mix),
-`scudo.italian` (comandi). Il client è quello del pilot
+`scudo.spotcheck_it` (campione ed esito umano), `scudo.italian` (comandi);
+l'ingresso nel mix è `scudo.mix_pool`. Il client è quello del pilot
 (`scudo.teacher_client`), il tetto `scudo.budget`.
 
 ## Cosa si traduce
@@ -104,11 +107,12 @@ diventano un rifiuto con motivo (`translation_refused`, `label_timeout`,
 Ogni dominio copre le cinque superfici v1 con target `VIOLATION` e
 `NO_VIOLATION`; l'over-refusal solo `NO_VIOLATION`. Nessun target
 `INSUFFICIENT`: dal testo libero non si costruisce (issue #6). Le superfici di
-injection usano due criteri v0 scritti in `scudo.generate_it`
-(`INJECTION_CRITERIA`), perché nessun criterio di default le copre. I misti
-(`mixed`) chiedono italiano con inserti inglesi (code-switching). Fonte dei
-casi generati: `scudo/teacher-generated`; `source_id` = primi 24 caratteri
-dello SHA-256 del testo generato; il generatore è in provenienza.
+injection usano i criteri di default `injection.direct` e `injection.indirect`
+(`scudo.default_criteria`), gli stessi dei convertitori di injection: il
+training ha una sola formulazione per criterio. I misti (`mixed`) chiedono
+italiano con inserti inglesi (code-switching). Fonte dei casi generati:
+`scudo/teacher-generated`; `source_id` = primi 24 caratteri dello SHA-256 del
+testo generato; il generatore è in provenienza e decide la voce del manifest.
 
 ## Spesa
 
@@ -185,15 +189,27 @@ all'hash del pool: se il pool cambia serve un nuovo campione. Un lotto respinto
 resta respinto: niente nuovo campione e niente mix; si rifà un lotto in una
 nuova cartella.
 
-## Mix
+## Ingresso nel mix
 
-`mix` unisce i casi del build (`--cases`, solo label gold di fonti ammesse dal
-cancello) e i pool dei lotti (`--batch`, solo con spot-check accettato) e
-sceglie `--n` casi con le quote `--shares` (default `it=0.4,en=0.4,mixed=0.2`,
-resti maggiori), per hash seminato. Se una lingua non ha abbastanza casi il
-comando fallisce elencando le carenze: niente riempimento con le altre lingue.
-Scrive `mix.jsonl` (caso, `key`, `origin`, provenienza per i casi del teacher) e
-`mix-meta.json` in `--dest`.
+Non c'è un mix italiano a parte: il lotto entra solo nel mix del Fast
+(`python -m scudo.mix_cli judge-set|build --italian DIR`), che toglie duplicati
+e conflitti, chiede la giuria per le label non gold e registra SHA del
+repository e digest del manifest. `scudo.mix_pool.load_italian` accetta il lotto
+solo se:
+
+- lo spot-check umano è accettato per il pool attuale (`batch_pool`);
+- ogni testo è scritto da un teacher del registro (`scudo.teacher.CANDIDATES`:
+  generatore per i generati, traduttore per i tradotti) che ha la sua voce di
+  training nel manifest (`teacher-gpt-oss-120b`, `teacher-qwen3.5-397b-a17b`),
+  alla stessa revisione e ammessa dal cancello. Un modello fuori dal registro è
+  un errore (`generator_not_teacher`), mai una riga saltata;
+- un caso tradotto è della voce della sua fonte, che deve essere ammessa; un
+  caso generato è della voce del teacher che lo ha scritto.
+
+Le voci dei teacher hanno la data card nel manifest (vedi
+[datasets.md](datasets.md#testi-dei-teacher)). Al 2026-10-15 i loro termini sono
+`INCERTO` senza decisione umana (provider non fissato): finché la persona non
+la scrive nessun lotto entra e il cancello blocca le build.
 
 ## Passi
 
@@ -228,14 +244,13 @@ rtk proxy uv run python -m scudo.italian spotcheck-export --out /perimetro/it-lo
 rtk proxy uv run python -m scudo.italian spotcheck-import --out /perimetro/it-lotto1 \
   --review /perimetro/spotcheck-compilato.csv --by "<madrelingua>"
 
-# 6. Mix
-rtk proxy uv run python -m scudo.italian mix --dest /perimetro/mix-v0.1 \
-  --cases /perimetro/build/aegis2-train.jsonl --batch /perimetro/it-lotto1 --n <N>
+# 6. Mix del Fast: passi in fast-v01.md, con --italian /perimetro/it-lotto1
 ```
 
-Le quantità `--translate`, `--native`, `--mixed` e `--n` le decide la persona
-dalla stima e dal residuo; per un mix 40/40/20 servono, dopo rifiuti e
-deduplica, almeno 0,4·n casi italiani e 0,2·n misti.
+Le quantità `--translate`, `--native` e `--mixed` le decide la persona dalla
+stima e dal residuo; il mix del Fast fallisce se uno strato (categoria, lingua)
+non si riempie, quindi servono, dopo rifiuti e deduplica, abbastanza casi
+italiani e misti per le quote 40/40/20 di ogni categoria.
 
 ## Cosa viene registrato
 
@@ -254,5 +269,5 @@ origine e lingua e di rifiutati per tipo e motivo.
 - La lingua dell'uscita non si verifica in automatico oltre a
   `translation_unchanged`: la controlla lo spot-check.
 - Il giudice dell'accordo di label è lo stesso modello che traduce o genera.
-- I criteri di injection v0 e i prompt di generazione non sono ancora stati
-  provati su un teacher reale: nessuna run reale è stata eseguita.
+- I prompt di generazione non sono ancora stati provati su un teacher reale:
+  nessuna run reale è stata eseguita.

@@ -30,9 +30,33 @@ completa. Al 2026-10-15 sono escluse `nemotron-sft-safety-v2` (termini Riva
 `NO`), `deepset-prompt-injections`, `gandalf-ignore-instructions`,
 `yanismiraoui-prompt-injections` (provenienza non verificabile o termini
 OpenAI) e `wildguardtest` (accesso gated non richiesto); `nemotron3-train`
-resta nel training con decisione e rischio registrati.
+resta nel training con decisione e rischio registrati. Le voci dei teacher
+(`teacher-gpt-oss-120b`, `teacher-qwen3.5-397b-a17b`) hanno termini `INCERTO`
+senza decisione: finché la persona non la scrive, `check` esce con 1 e ogni
+build si ferma.
 
 `python -m scudo.ingest check` stampa i motivi di blocco ed esce con 1.
+
+## Testi dei teacher
+
+Casi generati, evidenze tradotte e ragionamenti scritti dai teacher (#7, #9)
+sono dati di training come gli altri: entrano solo dalla voce del manifest del
+teacher che li ha scritti, una per modello del registro
+`scudo.teacher.CANDIDATES`. La voce usa `id` e `revisione` del modello, non di
+un dataset sul Hub: i testi stanno in lotti fuori dal repository, e ogni lotto
+è già fissato dal suo sha256 (pool legato allo spot-check e registrato nel
+manifest del mix). Licenza `apache-2.0`, quella dei modelli, che non limita gli
+output; gli split sono i tre tipi di testo (`generated`, `translated`,
+`reasoning`). I termini del provider non sono fissati dal codice (il provider
+si sceglie per run nel TOML del teacher), quindi restano `INCERTO`: la nota
+riassume la [ricerca sui provider](research/teacher-providers-2026-10-15.md) e
+la decisione (ad esempio quali provider ammettere) spetta alla persona.
+
+Un testo del teacher entra solo se il modello è nel registro e la sua voce
+esiste, ha la stessa revisione del registro e passa il cancello
+(`scudo.mix_pool.teacher_problem`); altrimenti `generator_not_teacher`,
+`teacher_not_in_manifest`, `teacher_revision_differs` o `teacher_blocked`. Le
+voci non hanno convertitore: `ingest build` le elenca in `not_ingested`.
 
 ## Build
 
@@ -112,7 +136,8 @@ percorso parallelo, `scudo.reasoning_data` (in `report.json` dell'ingestione
 compaiono in `not_ingested` con il comando da usare).
 
 ```sh
-rtk proxy uv run --extra train python -m scudo.reasoning_data build --out /percorso/autorizzato [--extra teacher.jsonl ...]
+rtk proxy uv run --extra train python -m scudo.reasoning_data build --out /percorso/autorizzato \
+  [--extra teacher.jsonl ... --ingest /percorso/build --italian /percorso/it-lotto ...]
 ```
 
 Stesso cancello del manifest, stessa cartella fuori dal repository, stesso
@@ -131,7 +156,9 @@ Regole:
 - restano fuori `refusal_data_augmentation`, i prompt `REDACTED` e le righe con
   una risposta: la traccia giudica insieme prompt e risposta, mentre
   l'evidenza della superficie `response` è la sola risposta. Resta la
-  superficie `prompt` (label umane), criterio `HARMFUL_REQUEST`;
+  superficie `prompt`, criterio `HARMFUL_REQUEST`, solo con
+  `prompt_label_source = human`: una label non umana esce come
+  `label del prompt non umana`;
 - la traccia è `<think>…</think>` seguita da `Prompt harm: harmful|unharmful`
   e `Response harm: …`; il verdetto della traccia è la riga `Prompt harm`
   (`harmful` → VIOLATION). Il ragionamento è il testo dentro `<think>`. Una
@@ -148,11 +175,27 @@ Ogni riga di `reasoning.jsonl` è un `ReasoningRecord` (`source`, `source_id`,
 `trace_verdict`, `generator`) più `format`, `prompt`, `completion` e
 `semantic_ids` del formato reasoned-decision. I file `--extra` (ragionamenti
 italiani del teacher, issue #7) contengono esattamente i campi di
-`ReasoningRecord`: fonte, id e generatore sono obbligatori; un record non
-valido ferma la build con file e riga; il disaccordo con la label e i
-duplicati dei benchmark escono contati, come per Nemotron.
+`ReasoningRecord`; un record non valido ferma la build con file e riga. Un
+record valido entra solo se:
+
+- `generator` è un teacher del registro con la sua voce ammessa (vedi
+  [Testi dei teacher](#testi-dei-teacher)), mai una stringa qualsiasi;
+- il caso d'origine (fonte, id, lingua, superficie, criterio, evidenza) è fra
+  quelli letti da `--ingest` (build di `scudo.ingest`) e `--italian` (lotti con
+  spot-check accettato), con gli stessi controlli del mix (`scudo.mix_pool`); la
+  sua voce è ammessa dal cancello (per un caso generato, quella del teacher che
+  l'ha scritto) e la label è gold;
+- `verdict` coincide con il gold del caso d'origine: il verdetto del record non
+  vale da solo.
+
+Gli scarti si contano per motivo in `rejected` (`generator_not_teacher`,
+`teacher_*`, `source_case_missing`, `source_case_conflict`, `source_blocked`,
+`source_label_not_gold`, `verdict_differs_from_source`); poi disaccordo con la
+label e duplicati dei benchmark escono contati, come per Nemotron. Senza
+`--ingest` né `--italian` ogni record esce come `source_case_missing`.
 `reasoning-report.json` riporta per fonte righe, scarti per motivo, tracce,
-disaccordi, rimossi per benchmark e tenuti per generatore e verdetto; ha anche
+disaccordi, rimossi per benchmark e tenuti per generatore e verdetto, più i
+casi d'origine letti e la loro provenienza (`source_cases`); ha anche
 `manifest_sha256`, `dedup` e `benchmarks` come il report di ingestione, quindi
 `python -m scudo.ingest verify --report reasoning-report.json` ne verifica la
 deduplica contro tutto il registro.

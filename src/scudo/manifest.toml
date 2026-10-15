@@ -294,7 +294,8 @@ generator_terms_note = "Tracce da modelli mit/apache-2.0; con gli stessi filtri 
 filters = [
   "solo split nemotron_content_safety_reasoning (file aegis_v2_efficient_reasoning.jsonl, digest verificato)",
   "righe refusal_data_augmentation e prompt REDACTED escluse",
-  "solo righe senza risposta (superficie prompt, label umane): la traccia giudica insieme prompt e risposta",
+  "solo righe senza risposta (superficie prompt): la traccia giudica insieme prompt e risposta",
+  "solo prompt_label_source = human: una label non umana non è gold",
   "tracce complete safety_reasoning_*; tenute solo se il verdetto finale (Prompt harm) coincide con la label",
   "deduplica contro tutti i benchmark del manifest",
 ]
@@ -678,6 +679,91 @@ authors = "tasksource; Sileo, D., «tasksource: A Large Collection of NLP tasks 
 url = "https://huggingface.co/datasets/tasksource/procedural-typed-decisions"
 changes = "domanda (o criterio riscritto per record_eligibility) come criterio e stato verbatim come evidenza; selezione delle domande esprimibili nel tri-state; deduplica contro i benchmark"
 risks = ["dominio non safety: decisioni procedurali", "stati lunghi e templati"]
+
+# --- Training: testi scritti dai teacher (#7, #9) ------------------------
+#
+# Una voce per teacher del registro (`scudo.teacher.CANDIDATES`): `id` e `revision`
+# sono quelli del modello che scrive i testi, perché i dati non stanno sul Hub ma in
+# lotti fuori dal repository, fissati ognuno dal proprio sha256 (pool e spot-check
+# nel manifest del mix). Gli split sono i tre tipi di testo del teacher.
+
+[[dataset]]
+name = "teacher-gpt-oss-120b"
+id = "openai/gpt-oss-120b"
+role = "train"
+revision = "b5c939de8f754692c1647ca79fbf85e8c1e70f8a"
+read_on = "2026-10-15"
+config = "default"
+splits = ["generated", "translated", "reasoning"]
+languages = ["it", "mixed", "en"]
+surfaces = ["prompt", "response", "injection_direct", "injection_indirect", "over_refusal"]
+license = "apache-2.0"
+license_source = "licenza del modello generatore: API cardData.license; LICENSE (Apache 2.0) e USAGE_POLICY (rispetto della legge applicabile) alla revisione; non gated (scudo.teacher.CANDIDATES); gli output sono nostri e non portano altra licenza"
+gated = false
+texts_by = "openai/gpt-oss-120b via il provider del TOML del teacher: casi IT e misti generati (scudo.generate_it), evidenze tradotte EN→IT (scudo.translate), ragionamenti dei file --extra (scudo.reasoning_data)"
+labels_by = "generati: verdetto richiesto confermato da una chiamata separata del teacher e spot-check umano del lotto; tradotti: label gold della fonte confermata dall'accordo; ragionamenti: verdetto gold del caso d'origine, mai quello del teacher"
+generators = [
+  "openai/gpt-oss-120b (apache-2.0, revisione letta; revisione servita dal provider NON VERIFICATO): testi, traduzioni, giudizio di accordo, ragionamenti",
+  "provider dell'inferenza: scelto per run nel TOML del teacher, termini letti dalla persona (terms_*)",
+]
+generator_terms = "INCERTO"
+generator_terms_note = "Il modello è Apache-2.0: la licenza non limita l'uso degli output. Il provider non è fissato dal codice: lo sceglie la persona nel TOML del teacher (fuori dal repository) con terms_url, terms_checked_by e terms_note, e il lotto ne registra provider e modello presso il provider. docs/research/teacher-providers-2026-10-15.md: termini letti e compatibili con il training per DeepInfra (raccomandato), Together, Scaleway, Baseten, Featherless; Novita e Cerebras compatibili sugli output ma con clausole d'uso che un corpus di jailbreak può far scattare; OVHcloud letto solo nella versione di test; Groq, Fireworks e Nscale NON VERIFICATO (per Fireworks una fonte non primaria segnala un divieto di addestrare sugli output). Con fatturazione Hugging Face non è documentato se valgano anche i termini del provider. Finché una persona non decide quali provider ammettere (e se basta la verifica per run nel TOML) i termini restano INCERTO."
+filters = [
+  "solo testi scritti da un modello del registro dei teacher con questa voce ammessa dal cancello",
+  "generati: accettati solo se una chiamata separata, che non vede il verdetto richiesto, dà quel verdetto",
+  "tradotti: solo da fonti ammesse con licenza che consente opere derivate; back-translation sopra soglia e accordo con la label gold",
+  "lotti italiani: deduplica contro tutti i benchmark del manifest e spot-check umano accettato (300 item, soglia 0,95) legato allo sha256 del pool",
+  "ragionamenti: caso d'origine gold di una voce ammessa, stesso verdetto, traccia in accordo; deduplica contro i benchmark",
+]
+title = "Testi del teacher openai/gpt-oss-120b per Scudo"
+authors = "naicud (Scudo); testi scritti con openai/gpt-oss-120b di OpenAI, Apache-2.0"
+url = "https://huggingface.co/openai/gpt-oss-120b"
+changes = "testi prodotti da noi con il teacher; criteri di default (scudo.default_criteria) per la generazione; per i tradotti il criterio resta quello della fonte"
+risks = [
+  "il giudice dell'accordo è lo stesso modello che genera o traduce",
+  "la revisione servita dal provider non è dichiarata: i pesi effettivi non sono verificati",
+  "termini del provider da decidere: vedi generator_terms_note",
+  "nessuna run reale eseguita al 2026-10-15",
+]
+
+[[dataset]]
+name = "teacher-qwen3.5-397b-a17b"
+id = "Qwen/Qwen3.5-397B-A17B"
+role = "train"
+revision = "8472618112abcbd45acbcdc58436aff4233c23f7"
+read_on = "2026-10-15"
+config = "default"
+splits = ["generated", "translated", "reasoning"]
+languages = ["it", "mixed", "en"]
+surfaces = ["prompt", "response", "injection_direct", "injection_indirect", "over_refusal"]
+license = "apache-2.0"
+license_source = "licenza del modello generatore: API cardData.license; LICENSE (Apache 2.0) alla revisione; non gated (scudo.teacher.CANDIDATES); gli output sono nostri e non portano altra licenza"
+gated = false
+texts_by = "Qwen/Qwen3.5-397B-A17B via il provider del TOML del teacher: casi IT e misti generati (scudo.generate_it), evidenze tradotte EN→IT (scudo.translate), ragionamenti dei file --extra (scudo.reasoning_data)"
+labels_by = "generati: verdetto richiesto confermato da una chiamata separata del teacher e spot-check umano del lotto; tradotti: label gold della fonte confermata dall'accordo; ragionamenti: verdetto gold del caso d'origine, mai quello del teacher"
+generators = [
+  "Qwen/Qwen3.5-397B-A17B (apache-2.0, revisione letta; revisione servita dal provider NON VERIFICATO): testi, traduzioni, giudizio di accordo, ragionamenti",
+  "provider dell'inferenza: scelto per run nel TOML del teacher, termini letti dalla persona (terms_*)",
+]
+generator_terms = "INCERTO"
+generator_terms_note = "Il modello è Apache-2.0: la licenza non limita l'uso degli output. Il provider non è fissato dal codice: lo sceglie la persona nel TOML del teacher (fuori dal repository) con terms_url, terms_checked_by e terms_note, e il lotto ne registra provider e modello presso il provider. docs/research/teacher-providers-2026-10-15.md: termini letti e compatibili con il training per DeepInfra (raccomandato), Together, Scaleway, Baseten, Featherless; Novita e Cerebras compatibili sugli output ma con clausole d'uso che un corpus di jailbreak può far scattare; OVHcloud letto solo nella versione di test; Groq, Fireworks e Nscale NON VERIFICATO (per Fireworks una fonte non primaria segnala un divieto di addestrare sugli output). Con fatturazione Hugging Face non è documentato se valgano anche i termini del provider. Finché una persona non decide quali provider ammettere (e se basta la verifica per run nel TOML) i termini restano INCERTO."
+filters = [
+  "solo testi scritti da un modello del registro dei teacher con questa voce ammessa dal cancello",
+  "generati: accettati solo se una chiamata separata, che non vede il verdetto richiesto, dà quel verdetto",
+  "tradotti: solo da fonti ammesse con licenza che consente opere derivate; back-translation sopra soglia e accordo con la label gold",
+  "lotti italiani: deduplica contro tutti i benchmark del manifest e spot-check umano accettato (300 item, soglia 0,95) legato allo sha256 del pool",
+  "ragionamenti: caso d'origine gold di una voce ammessa, stesso verdetto, traccia in accordo; deduplica contro i benchmark",
+]
+title = "Testi del teacher Qwen/Qwen3.5-397B-A17B per Scudo"
+authors = "naicud (Scudo); testi scritti con Qwen/Qwen3.5-397B-A17B di Qwen (Alibaba Cloud), Apache-2.0"
+url = "https://huggingface.co/Qwen/Qwen3.5-397B-A17B"
+changes = "testi prodotti da noi con il teacher; criteri di default (scudo.default_criteria) per la generazione; per i tradotti il criterio resta quello della fonte"
+risks = [
+  "il giudice dell'accordo è lo stesso modello che genera o traduce",
+  "la revisione servita dal provider non è dichiarata: i pesi effettivi non sono verificati",
+  "termini del provider da decidere: vedi generator_terms_note",
+  "nessuna run reale eseguita al 2026-10-15",
+]
 
 # --- Benchmark held-out (solo valutazione) ----------------------------------
 
