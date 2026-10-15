@@ -120,13 +120,16 @@ chiamate per item (traduzione e back-translation): l'accordo di label ne
 aggiunge una.
 
 `run` rifiuta, prima di qualsiasi chiamata, se manca la conferma del volume, se
-il teacher non è quello confermato, se la stima arrotondata al centesimo supera
-il residuo del volume confermato (importo dell'ultima `volume_confirmation`
-meno le chiamate registrate dopo) o del tetto, o se `--confirm-spend` non
-coincide. Poi un item parte solo se il suo caso peggiore sta nell'autorizzato e
-ogni chiamata è controllata dallo stesso stop rigido del pilot. Ogni chiamata
-va nel registro (`call`, `run_id` = `it-<sha del piano>`); 401/403 fermano la
-run senza registrare l'item. Una run interrotta riprende saltando gli item
+il teacher non è quello dell'ultima conferma, se la stima arrotondata al
+centesimo supera il residuo del volume confermato (importo dell'ultima
+`volume_confirmation` meno le chiamate registrate dopo) o del tetto, o se
+`--confirm-spend` non coincide: è lo stesso controllo del giudizio in volume
+(`scudo.budget.check_volume`). Poi un item parte solo se il suo caso peggiore
+sta nell'autorizzato e ogni chiamata è controllata dallo stesso stop rigido e
+addebitata con la stessa regola del pilot (`scudo.budget.paid_call`: uso reale,
+altrimenti caso peggiore, anche per un corpo interrotto dopo un 200). Ogni
+chiamata va nel registro (`call`, `run_id` = `it-<sha del piano>`); 401/403
+fermano la run senza registrare l'item. Una run interrotta riprende saltando gli item
 fatti, con nuova stima e nuova conferma.
 
 ## Deduplica

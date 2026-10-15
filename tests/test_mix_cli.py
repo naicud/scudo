@@ -2,13 +2,14 @@ import hashlib
 import json
 import math
 import subprocess
+import urllib.request
 from collections import Counter
 from dataclasses import asdict, replace
 from functools import partial
 
 import pytest
 
-from scudo import italian_run, mix_cli, spotcheck_it
+from scudo import italian_run, mix_cli, pilot, spotcheck_it
 from scudo.budget import BudgetError, Ledger, confirm_volume
 from scudo.mix import MixError, Targets
 from scudo.spotcheck_it import SpotCheckError
@@ -17,6 +18,7 @@ from test_manifest import TRAIN
 from test_mix import EN_ONLY, judged, pool
 from test_pilot import toml
 from test_spotcheck_it import fill, item
+from scudo.teacher import load_configs
 from test_teacher import CONFIG
 
 DIGEST = "a" * 64
@@ -139,19 +141,92 @@ def test_mix_output_inside_the_repository_is_refused(tmp_path, monkeypatch):
         mix_cli.check_outside_repo(mix_cli.REPO_ROOT / "mix")
 
 
-def test_volume_judging_needs_the_human_confirmation_of_each_teacher(tmp_path, monkeypatch):
+GPT, QWEN = CONFIG["model_id"], "Qwen/Qwen3.5-397B-A17B"
+QWEN_CONFIG = {**CONFIG, "model_id": QWEN, "provider_model": "qwen3.5-397b",
+               "api_key_env": "SCUDO_TEST_KEY_2"}
+PRICY = {"output_usd_per_mtok": 60_000.0}  # una chiamata nel caso peggiore costa ~60 USD
+
+
+class Judged:
+    """Risposta finta di un teacher: VIOLATION con uso riportato."""
+
+    status = 200
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *exc):
+        return False
+
+    def read(self):
+        content = json.dumps({"verdict": "VIOLATION", "reasoning": "Motivo."})
+        return json.dumps({"choices": [{"message": {"content": content}, "finish_reason": "stop"}],
+                           "usage": {"prompt_tokens": 100, "completion_tokens": 20}}).encode()
+
+
+def judge_inputs(tmp_path, monkeypatch, tables=(CONFIG,), network=False):
+    """Campione di un caso e TOML; senza `network` urlopen fallisce il test se viene chiamato."""
     monkeypatch.setenv("SCUDO_TEST_KEY", "k-not-real")
+    monkeypatch.setenv("SCUDO_TEST_KEY_2", "k2-not-real")
+
+    def urlopen(request, timeout):
+        if not network:
+            raise AssertionError("chiamata di rete in un test")
+        return Judged()
+
+    monkeypatch.setattr(urllib.request, "urlopen", urlopen)
     out = tmp_path / "judge"
     out.mkdir()
     (out / "sample.jsonl").write_text(json.dumps({
         "set": "volume", "key": "harm:1:prompt", "criterion": "c", "evidence": "e"}) + "\n")
     teachers = tmp_path / "teachers.toml"
-    teachers.write_text(toml([CONFIG]), encoding="utf-8")
-    ledger = tmp_path / "ledger.jsonl"
+    teachers.write_text(toml(list(tables)), encoding="utf-8")
+    return out, teachers, tmp_path / "ledger.jsonl"
+
+
+def judge_confirm(out, teachers, ledger):
+    return pilot.estimate(out, load_configs(teachers), Ledger(ledger))["confirm"]
+
+
+def confirm(ledger, teachers, amount):
+    confirm_volume(Ledger(ledger), teachers=teachers, amount_usd=amount, by="persona",
+                   rationale="scelta dal report del pilot")
+
+
+def test_two_teacher_judging_within_the_confirmed_amount_runs(tmp_path, monkeypatch):
+    out, teachers, ledger = judge_inputs(tmp_path, monkeypatch, (CONFIG, QWEN_CONFIG),
+                                         network=True)
+    confirm(ledger, [GPT, QWEN], 10)
+    result = mix_cli.judge(out, teachers, ledger, confirm=judge_confirm(out, teachers, ledger))
+    assert result["done"] == 2 and result["stopped"] is None
+    assert {o["teacher"] for o in pilot.read_outcomes(out)} == {GPT, QWEN}
+
+
+def test_judging_refuses_a_teacher_outside_the_latest_confirmed_set(tmp_path, monkeypatch):
+    out, teachers, ledger = judge_inputs(tmp_path, monkeypatch, (CONFIG, QWEN_CONFIG))
+    confirm(ledger, [GPT, QWEN], 10)
+    confirm(ledger, [QWEN], 10)  # vale solo l'ultima conferma
+    with pytest.raises(BudgetError, match="senza conferma del volume"):
+        mix_cli.judge(out, teachers, ledger, confirm=judge_confirm(out, teachers, ledger))
+    assert not (out / "outcomes.jsonl").exists()
+
+
+def test_judging_refuses_a_teacher_sum_over_the_confirmed_amount(tmp_path, monkeypatch):
+    out, teachers, ledger = judge_inputs(
+        tmp_path, monkeypatch, ({**CONFIG, **PRICY}, {**QWEN_CONFIG, **PRICY}))
+    confirm(ledger, [GPT, QWEN], 100)
+    total = judge_confirm(out, teachers, ledger)
+    assert 100 < float(total) < 150  # ogni teacher da solo starebbe nei 100 USD
+    with pytest.raises(BudgetError, match="volume confermato"):
+        mix_cli.judge(out, teachers, ledger, confirm=total)
+    assert not Ledger(ledger).of_kind("authorisation")
+
+
+def test_volume_judging_needs_the_human_confirmation_of_each_teacher(tmp_path, monkeypatch):
+    out, teachers, ledger = judge_inputs(tmp_path, monkeypatch)
     with pytest.raises(BudgetError, match="conferma umana"):
         mix_cli.judge(out, teachers, ledger, confirm="0.01")
-    confirm_volume(Ledger(ledger), teacher="Qwen/Qwen3.5-397B-A17B", amount_usd=10,
-                   by="persona", rationale="scelta dal report del pilot")
+    confirm(ledger, [QWEN], 10)
     with pytest.raises(BudgetError, match="senza conferma del volume"):
         mix_cli.judge(out, teachers, ledger, confirm="0.01")
     assert not (out / "outcomes.jsonl").exists()

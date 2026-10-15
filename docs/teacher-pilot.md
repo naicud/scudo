@@ -137,9 +137,9 @@ rtk proxy uv run python -m scudo.pilot report --out /perimetro/pilot \
   --teachers /perimetro/teachers.toml --ledger /perimetro/spesa-v0.1.jsonl \
   [--spotcheck /perimetro/relabel-spotcheck-compilato.csv]
 
-# 5. Solo la persona, dopo aver scelto il teacher
+# 5. Solo la persona, dopo aver scelto il teacher (o i teacher: --teacher ripetibile)
 rtk proxy uv run python -m scudo.pilot confirm-volume --ledger /perimetro/spesa-v0.1.jsonl \
-  --teacher <id> --amount <USD> --by "<nome>" --rationale "<perché>"
+  --teacher <id> [--teacher <id2>] --amount <USD totali> --by "<nome>" --rationale "<perché>"
 ```
 
 La stima è il caso peggiore: token d'ingresso stimati come caratteri/4 (una
@@ -153,7 +153,13 @@ una nuova stima e una nuova conferma. Le chiamate sono sequenziali.
 
 `run` rifiuta anche un campione oltre 1.000 casi, o un campione diverso da
 quello del pilot già riportato, finché il registro non ha una
-`volume_confirmation`.
+`volume_confirmation`. Con una conferma nel registro ogni run è in volume e
+passa dallo stesso controllo degli altri strumenti del volume
+(`scudo.budget.check_volume`): vale solo l'ultima conferma, ogni teacher della
+run deve essere nel suo insieme di teacher, e la stima della run (somma su
+tutti i teacher) arrotondata al centesimo deve stare nel residuo del volume
+confermato (importo dell'ultima conferma meno le chiamate registrate dopo) e
+del tetto.
 
 ## Client
 
@@ -169,9 +175,19 @@ presenti). Esiti:
 - `malformed`, `timeout`, `error`.
 
 Solo `ok` ha un verdetto; ogni altro esito conta come disaccordo e non diventa
-mai `NO_VIOLATION`. Costo: dall'uso reale; senza uso riportato (timeout, 5xx,
-provider muto) si addebita il caso peggiore; una richiesta respinta (4xx) costa
-zero; 401/403 fermano la run senza registrare un esito.
+mai `NO_VIOLATION`. Costo, con un'unica regola per pilot, volume e dati
+italiani (`scudo.budget.paid_call`): dall'uso reale; senza uso riportato
+(timeout, errore di rete, 5xx, corpo interrotto dopo un 200, risposta HTTP non
+valida, provider muto) si addebita il caso peggiore, perché il provider può aver
+già fatturato; lo stesso se la chiamata solleva un'eccezione imprevista, che
+poi interrompe la run; una richiesta respinta (4xx) costa zero; 401/403
+fermano la run senza registrare un esito.
+
+Il dettaglio degli errori (al più 200 caratteri del messaggio del provider)
+finisce in esiti, registro dei risultati e stderr: prima se ne tolgono ogni
+frammento della chiave lungo almeno 4 caratteri e ogni token dall'aspetto di
+chiave (`Bearer …`, `sk-…`, `hf_…`), sostituiti da `[redatto]`, perché alcuni
+provider rimandano parte della chiave nei 401.
 
 ## Cosa viene registrato
 
@@ -184,8 +200,9 @@ umana), `relabel-spotcheck.csv`.
 
 Nel registro della spesa (JSONL fuori dal repository): `authorisation`
 (importo confermato), `call` (costo di ogni chiamata), `pilot_report`,
-`volume_confirmation` (teacher scelto, importo, chi, perché). Nessuna chiave e
-nessun testo dei dataset entra nel registro.
+`volume_confirmation` (teacher scelti, un solo importo totale, chi, perché;
+le conferme più vecchie con un solo campo `teacher` restano valide). Nessuna
+chiave e nessun testo dei dataset entra nel registro.
 
 ## Report
 
@@ -213,8 +230,12 @@ valida con lo spot-check di #7.
 
 ## Dopo il pilot
 
-La persona sceglie il teacher dal report, registra provider, versione e termini
-verificati (il TOML e `summary.md` nell'issue #5) e, solo se vuole procedere,
-esegue `confirm-volume`. Gli strumenti del volume (#7, #8, #9) chiamano
-`scudo.budget.require_volume_confirmation` prima di spendere. Dati italiani
+La persona sceglie il teacher (o i teacher, per la difficoltà di #8 che nasce
+dal disaccordo fra due teacher) dal report, registra provider, versione e
+termini verificati (il TOML e `summary.md` nell'issue #5) e, solo se vuole
+procedere, esegue `confirm-volume` con un `--teacher` per ciascuno e un solo
+`--amount` totale. Gli strumenti del volume (#7, #8, #9) chiamano
+`scudo.budget.check_volume` prima di spendere: insieme di teacher e residuo
+dell'ultima conferma, poi il tetto. Una nuova conferma sostituisce la
+precedente (teacher e importo). Dati italiani
 (#7): [italian-data.md](italian-data.md).

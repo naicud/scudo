@@ -8,10 +8,12 @@ Comandi (`python -m scudo.pilot ...`, cartelle e file sempre fuori dal repositor
 - `estimate`: prova a secco, nessuna chiamata; stampa la stima e il valore esatto
   da passare a `--confirm-spend`;
 - `run --confirm-spend X`: chiama i teacher solo se X coincide con la stima e la
-  stima sta nel residuo del tetto v0.1; si ferma prima di superare X; riprende
-  saltando le coppie (teacher, caso) già fatte;
+  stima sta nel residuo del tetto v0.1 (e, dopo una conferma del volume, nel suo
+  residuo e con il suo teacher: `budget.check_volume`); si ferma prima di
+  superare X; riprende saltando le coppie (teacher, caso) già fatte;
 - `report`: metriche, stima del volume v0.1, export per la revisione umana;
-- `confirm-volume`: la persona registra teacher scelto e spesa in volume.
+- `confirm-volume`: la persona registra i teacher scelti (`--teacher` ripetibile)
+  e un solo importo in volume per tutti.
 
 Campione in `scudo.pilot_sample`, client in `scudo.teacher_client`, tetto e
 registro in `scudo.budget`, report in `scudo.pilot_report`. Guida:
@@ -92,9 +94,11 @@ def estimate(out: Path, configs: list[TeacherConfig], ledger: Ledger) -> dict:
                       "più max_tokens in uscita per chiamata (caso peggiore, stima)"}
 
 
-def _check_pilot_scope(out: Path, ledger: Ledger) -> None:
-    """Dopo il pilot, o oltre la sua taglia, serve la conferma umana del volume."""
+def _check_scope(out: Path, configs: list[TeacherConfig], ledger: Ledger, planned: float) -> None:
+    """Con una conferma del volume la run è in volume e passa da `budget.check_volume`;
+    senza, è il pilot: oltre la sua taglia, o dopo il suo report, serve la conferma."""
     if ledger.of_kind("volume_confirmation"):
+        budget.check_volume(ledger, [cfg.model_id for cfg in configs], planned)
         return
     if len(read_sample(out)) > MAX_PILOT_CASES:
         raise BudgetError(f"oltre {MAX_PILOT_CASES} casi è volume: manca la conferma umana")
@@ -107,35 +111,24 @@ def _check_pilot_scope(out: Path, ledger: Ledger) -> None:
 def run(out: Path, configs: list[TeacherConfig], ledger: Ledger, *, confirm: str | None,
         transport=None, environ=None, sleep=None) -> dict:
     """Chiamate mancanti con stop rigido; ogni esito va in outcomes.jsonl, ogni costo nel registro."""
-    _check_pilot_scope(out, ledger)
+    todo = _todo(out, configs)
+    planned = math.fsum(budget.worst_case_usd(cfg, chat) for cfg, _, chat in todo)
+    _check_scope(out, configs, ledger, planned)
     options = {k: v for k, v in (("transport", transport), ("environ", environ),
                                  ("sleep", sleep)) if v is not None}
     clients = {cfg.model_id: Client(cfg, **options) for cfg in configs}  # chiavi prima di spendere
-    todo = _todo(out, configs)
-    planned = math.fsum(budget.worst_case_usd(cfg, chat) for cfg, _, chat in todo)
     run_id = sample_sha(out)[:16]
     authorised = budget.authorise(ledger, run_id, planned, confirm)
     guard = Guard(ledger, run_id, authorised)
     done, stopped = 0, None
     with (out / "outcomes.jsonl").open("a", encoding="utf-8") as handle:
         for cfg, record, chat in todo:
-            worst = budget.worst_case_usd(cfg, chat)
             try:
-                guard.check(worst)
-            except BudgetError as error:
+                outcome, cost, usage_missing = budget.paid_call(
+                    guard, cfg, record["key"], chat, partial(clients[cfg.model_id].judge, chat))
+            except BudgetError as error:  # stop rigido o chiave rifiutata
                 stopped = str(error)
                 break
-            outcome = clients[cfg.model_id].judge(chat)
-            if outcome.http_status in (401, 403):  # configurazione, non un esito del teacher
-                stopped = f"{cfg.model_id}: {outcome.detail}; chiave o permessi da verificare"
-                break
-            usage_missing = outcome.prompt_tokens is None or outcome.completion_tokens is None
-            # Una richiesta respinta (4xx) non genera; senza uso riportato (timeout, 5xx,
-            # provider muto) si addebita il caso peggiore.
-            rejected = outcome.http_status is not None and 400 <= outcome.http_status < 500
-            cost = 0.0 if rejected else worst if usage_missing else budget.cost_usd(
-                cfg, outcome.prompt_tokens, outcome.completion_tokens)
-            guard.charge(cfg.model_id, record["key"], cost, usage_missing=usage_missing)
             handle.write(json.dumps({"teacher": cfg.model_id, "key": record["key"],
                                      "set": record["set"], **asdict(outcome), "cost_usd": cost,
                                      "usage_missing": usage_missing}, ensure_ascii=False) + "\n")
@@ -165,9 +158,11 @@ def main(argv: list[str] | None = None) -> int:
     pilot_report.add_arguments(commands.choices["report"])
     volume = commands.add_parser("confirm-volume", help="solo la persona: teacher e spesa in volume")
     volume.add_argument("--ledger", required=True, type=Path)
-    for name in ("--teacher", "--by", "--rationale"):
+    volume.add_argument("--teacher", required=True, action="append",
+                        help="ripetibile: tutti i teacher coperti dall'importo")
+    for name in ("--by", "--rationale"):
         volume.add_argument(name, required=True)
-    volume.add_argument("--amount", required=True, type=float)
+    volume.add_argument("--amount", required=True, type=float, help="totale per tutti i teacher")
     args = parser.parse_args(argv)
     try:
         if args.command == "sample":
@@ -179,8 +174,8 @@ def main(argv: list[str] | None = None) -> int:
             write_sample(out, built)
             print(json.dumps(built["meta"], indent=2, ensure_ascii=False))
         elif args.command == "confirm-volume":
-            budget.confirm_volume(Ledger(args.ledger), teacher=args.teacher, amount_usd=args.amount,
-                                  by=args.by, rationale=args.rationale)
+            budget.confirm_volume(Ledger(args.ledger), teachers=args.teacher,
+                                  amount_usd=args.amount, by=args.by, rationale=args.rationale)
             print("conferma del volume registrata")
         else:
             configs, ledger = load_configs(args.teachers), Ledger(args.ledger)

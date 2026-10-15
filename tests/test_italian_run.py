@@ -1,4 +1,5 @@
 import json
+import urllib.request
 from dataclasses import replace
 
 import pytest
@@ -8,7 +9,7 @@ from scudo.budget import BudgetError, Ledger
 from scudo.ingest import REPO_ROOT
 from scudo.teacher import parse_configs
 from test_manifest import BENCH, TRAIN
-from test_teacher import CONFIG
+from test_teacher import CONFIG, cut_urlopen
 
 AEGIS = replace(TRAIN, name="aegis2-train", id=aegis.DATASET)
 BENCH_IT = replace(BENCH, name="bench-it", id="org/bench-it", text_fields=("prompt",))
@@ -76,7 +77,7 @@ def setup(tmp_path, *, translate_n=6, native_n=4, mixed_n=2, amount=10.0, confir
     italian_run.write_plan(out, plan)
     ledger = Ledger(tmp_path / "spesa.jsonl")
     if confirm:
-        budget.confirm_volume(ledger, teacher=TEACHER, amount_usd=amount, by="Mario Rossi",
+        budget.confirm_volume(ledger, teachers=[TEACHER], amount_usd=amount, by="Mario Rossi",
                               rationale="pilot riportato")
     [cfg] = parse_configs({"teacher": [CONFIG]})
     return out, cfg, ledger
@@ -125,7 +126,7 @@ def test_run_refuses_without_the_human_volume_confirmation(tmp_path):
 def test_run_refuses_a_teacher_other_than_the_confirmed_one(tmp_path):
     out, cfg, ledger = setup(tmp_path)
     other = replace(cfg, model_id="Qwen/Qwen3.5-397B-A17B")
-    with pytest.raises(BudgetError, match="confermato"):
+    with pytest.raises(BudgetError, match="senza conferma del volume"):
         run(out, other, ledger, italian_run.estimate(out, other, ledger)["confirm"])
 
 
@@ -174,6 +175,17 @@ def test_unauthorised_key_stops_without_recording_a_result(tmp_path):
     result = run(out, cfg, ledger, italian_run.estimate(out, cfg, ledger)["confirm"], transport)
     assert result["stopped"] and result["done"] == 0 and transport.calls == 1
     assert italian_run.read_results(out) == []
+
+
+def test_cut_body_after_200_is_charged_at_worst_case(tmp_path, monkeypatch):
+    out, cfg, ledger = setup(tmp_path, translate_n=2, native_n=1, mixed_n=0)
+    confirm = italian_run.estimate(out, cfg, ledger)["confirm"]
+    monkeypatch.setattr(urllib.request, "urlopen", cut_urlopen)  # trasporto reale, rete finta
+    result = italian_run.run(out, cfg, ledger, confirm=confirm, environ=ENV, sleep=lambda s: None)
+    assert result["done"] == 3 and result["stopped"] is None
+    calls = ledger.of_kind("call")
+    assert calls and all(c["usage_missing"] and c["cost_usd"] > 0 for c in calls)
+    assert ledger.spent() == pytest.approx(result["summary"]["cost_usd"])
 
 
 def test_dedup_removes_benchmark_matches_and_batch_duplicates(tmp_path):

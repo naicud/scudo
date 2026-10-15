@@ -4,8 +4,9 @@
   esclusi) più gli INSUFFICIENT generati, nel formato del campione del pilot,
   da far giudicare ai teacher per rietichettatura e difficoltà;
 - `judge --out JDIR --teachers T --ledger L --confirm-spend X`: run dei teacher in
-  volume; senza la conferma umana del volume (`scudo.budget`) e senza che ogni
-  teacher configurato sia fra quelli confermati non parte nessuna chiamata;
+  volume; senza la conferma umana del volume (`scudo.budget`), con un teacher
+  fuori dall'insieme dell'ultima conferma o con una stima (somma sui teacher)
+  oltre il residuo del volume confermato non parte nessuna chiamata;
 - `build --ingest DIR --outcomes F... --out MDIR`: mix e manifest del mix;
 - `upload --out MDIR --repo R`: carica mix, manifest e report di ingestione su un
   repository dataset privato e stampa revisione e digest da dare al notebook.
@@ -72,14 +73,11 @@ def judge_set(ingest: Path, italian: list[Path], out: Path) -> dict:
 
 
 def judge(out: Path, teachers: Path, ledger_path: Path, confirm: str | None) -> dict:
-    """Run in volume dei teacher: solo dopo la conferma umana, solo con teacher confermati."""
+    """Run in volume dei teacher: mai come pilot; con la conferma, `pilot.run` applica
+    `budget.check_volume` (teacher e residuo dell'ultima conferma, tetto)."""
     ledger = Ledger(ledger_path)
     require_volume_confirmation(ledger)
-    confirmed = {record["teacher"] for record in ledger.of_kind("volume_confirmation")}
-    configs = load_configs(teachers)
-    if missing := sorted(c.model_id for c in configs if c.model_id not in confirmed):
-        raise BudgetError(f"teacher senza conferma del volume: {missing}")
-    return pilot.run(out, configs, ledger, confirm=confirm)
+    return pilot.run(out, load_configs(teachers), ledger, confirm=confirm)
 
 
 def build_mix(ingest: Path, italian: list[Path], outcomes: list[Path], out: Path, *,

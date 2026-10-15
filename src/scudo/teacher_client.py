@@ -2,12 +2,15 @@
 
 Ritenta con backoff esponenziale solo 429 e 5xx; registra l'uso di token della
 risposta e, se il provider restituisce i logprob (`logprobs`/`top_logprobs` in
-`request_extra`), il margine del verdetto (`scudo.teacher_margin`). La chiave si legge dalla variabile d'ambiente della configurazione, va
-solo nell'header e non compare mai in record, repr o errori. Rifiuto,
-troncamento, output malformato, timeout ed errore restano tali, senza verdetto:
-non diventano mai `NO_VIOLATION`.
+`request_extra`), il margine del verdetto (`scudo.teacher_margin`). La chiave si
+legge dalla variabile d'ambiente della configurazione, va solo nell'header e non
+compare mai in record, repr o errori: dai dettagli degli errori (anche quelli
+che il provider rimanda indietro) si tolgono i frammenti della chiave e i token
+dall'aspetto di chiave (`redact`). Rifiuto, troncamento, output malformato,
+timeout ed errore restano tali, senza verdetto: non diventano mai `NO_VIOLATION`.
 """
 
+import http.client
 import json
 import os
 import re
@@ -49,29 +52,62 @@ Transport = Callable[[str, dict, bytes, float], tuple[int, bytes]]
 
 
 def urllib_transport(url: str, headers: dict, payload: bytes, timeout: float) -> tuple[int, bytes]:
-    """POST con urllib; un timeout diventa TimeoutError, un errore di rete OSError."""
+    """POST con urllib; un timeout diventa TimeoutError, ogni altro guasto dello scambio OSError.
+
+    Anche un corpo interrotto dopo un 200 (`IncompleteRead`) o una risposta HTTP non
+    valida diventano OSError: il chiamante li registra come errore senza uso, cioè
+    al caso peggiore, perché il provider può averli già fatturati.
+    """
     request = urllib.request.Request(url, data=payload, headers=headers, method="POST")
     try:
         with urllib.request.urlopen(request, timeout=timeout) as response:
             return response.status, response.read()
     except urllib.error.HTTPError as error:
-        return error.code, error.read()
+        try:
+            return error.code, error.read()
+        except (http.client.HTTPException, OSError):
+            return error.code, b""
     except urllib.error.URLError as error:
         if isinstance(error.reason, TimeoutError):
             raise TimeoutError(str(error.reason)) from None
         raise OSError(f"errore di rete: {error.reason}") from None
+    except http.client.HTTPException as error:
+        raise OSError(f"risposta HTTP interrotta o non valida: {type(error).__name__} "
+                      f"{error}") from None
 
 
 def _int(value) -> int | None:
     return value if isinstance(value, int) and not isinstance(value, bool) else None
 
 
-def _error_detail(status: int, raw: bytes) -> str:
+REDACTED = "[redatto]"
+_MIN_FRAGMENT = 4  # frammenti della chiave più corti non identificano la chiave
+_TOKEN_LIKE = re.compile(r"\bbearer\s+[^\s\"',;]+|\b(?:sk|hf)[-_][^\s\"',;]+", re.IGNORECASE)
+
+
+def redact(text: str, key: str) -> str:
+    """Toglie ogni frammento della chiave (da 4 caratteri) e ogni token dall'aspetto di chiave."""
+    out, i = [], 0
+    while i < len(text):
+        n = _MIN_FRAGMENT
+        while i + n <= len(text) and text[i:i + n] in key:
+            n += 1
+        if n > _MIN_FRAGMENT:  # text[i:i + n - 1] è il frammento più lungo della chiave
+            out.append(REDACTED)
+            i += n - 1
+        else:
+            out.append(text[i])
+            i += 1
+    return _TOKEN_LIKE.sub(REDACTED, "".join(out))
+
+
+def _error_detail(status: int, raw: bytes, key: str) -> str:
     try:
         message = json.loads(raw)["error"]["message"]
     except (ValueError, KeyError, TypeError):
         message = ""
-    return f"HTTP {status}" + (f": {str(message)[:200]}" if message else "")
+    message = redact(str(message)[:2000], key)[:200]
+    return f"HTTP {status}" + (f": {message}" if message else "")
 
 
 class Client:
@@ -113,15 +149,16 @@ class Client:
             except TimeoutError:
                 return Outcome("timeout", detail=f"nessuna risposta entro {cfg.timeout_s} s")
             except OSError as error:
-                return Outcome("error", detail=str(error)[:200])
+                return Outcome("error", detail=redact(str(error)[:2000], self._key)[:200])
             if status == 200:
                 return _outcome(raw, parse)
             if status not in RETRY_STATUSES:
-                return Outcome("error", detail=_error_detail(status, raw), http_status=status)
+                return Outcome("error", detail=_error_detail(status, raw, self._key),
+                               http_status=status)
             if attempt < self._retries:
                 self._sleep(self._backoff * 2 ** attempt)
-        return Outcome("error", detail=f"{_error_detail(status, raw)} dopo {self._retries + 1} "
-                       "tentativi", http_status=status)
+        return Outcome("error", detail=f"{_error_detail(status, raw, self._key)} dopo "
+                       f"{self._retries + 1} tentativi", http_status=status)
 
 
 def _judgement(content) -> dict:

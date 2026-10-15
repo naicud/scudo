@@ -21,6 +21,7 @@ import hashlib
 import json
 import math
 from collections import Counter
+from functools import partial
 from pathlib import Path
 
 from scudo import budget, generate_it, translate
@@ -32,10 +33,6 @@ from scudo.teacher import CANDIDATES, TeacherConfig
 from scudo.teacher_client import Client
 
 PLAN, META, RESULTS, POOL = "plan.jsonl", "plan-meta.json", "results.jsonl", "pool.jsonl"
-
-
-class _Stop(Exception):
-    """Chiave o permessi rifiutati: si ferma senza registrare l'item."""
 
 
 def _jsonl(path: Path) -> list[dict]:
@@ -137,17 +134,9 @@ def _translator(cfg: TeacherConfig) -> dict:
 
 def _caller(client: Client, cfg: TeacherConfig, guard: Guard, key: str, calls: list):
     def call(step: str, chat: list[dict], field: str | None):
-        worst = budget.worst_case_usd(cfg, chat)
-        guard.check(worst)
-        outcome = client.judge(chat) if field is None else client.complete(chat, field)
-        if outcome.http_status in (401, 403):  # configurazione, non un esito del teacher
-            raise _Stop(f"{cfg.model_id}: {outcome.detail}; chiave o permessi da verificare")
-        # Stesse regole del pilot: 4xx costa zero, senza uso riportato il caso peggiore.
-        usage_missing = outcome.prompt_tokens is None or outcome.completion_tokens is None
-        rejected = outcome.http_status is not None and 400 <= outcome.http_status < 500
-        cost = 0.0 if rejected else worst if usage_missing else budget.cost_usd(
-            cfg, outcome.prompt_tokens, outcome.completion_tokens)
-        guard.charge(cfg.model_id, f"{key}:{step}", cost, usage_missing=usage_missing)
+        send = partial(client.judge, chat) if field is None else partial(client.complete, chat,
+                                                                          field)
+        outcome, cost, usage_missing = budget.paid_call(guard, cfg, f"{key}:{step}", chat, send)
         calls.append({"step": step, "status": outcome.status, "detail": outcome.detail,
                       "prompt_tokens": outcome.prompt_tokens,
                       "completion_tokens": outcome.completion_tokens,
@@ -158,16 +147,9 @@ def _caller(client: Client, cfg: TeacherConfig, guard: Guard, key: str, calls: l
 
 
 def _check_volume(cfg: TeacherConfig, ledger: Ledger, planned: float) -> None:
-    confirmation = budget.require_volume_confirmation(ledger)
-    if confirmation["teacher"] != cfg.model_id:
-        raise BudgetError(f"teacher {cfg.model_id} diverso da quello confermato "
-                          f"{confirmation['teacher']}")
+    budget.check_volume(ledger, [cfg.model_id], planned)
     if CANDIDATES[cfg.model_id].license not in translate.TRANSLATOR_LICENSES:
         raise BudgetError(f"licenza del teacher {CANDIDATES[cfg.model_id].license} non ammessa")
-    left = budget.volume_remaining(ledger)
-    if budget.cents_up(planned) > left + 1e-9:
-        raise BudgetError(f"stima {budget.cents_up(planned):.2f} USD oltre il residuo "
-                          f"{left:.2f} USD del volume confermato")
 
 
 def run(out: Path, cfg: TeacherConfig, ledger: Ledger, *, confirm: str | None,
@@ -195,7 +177,7 @@ def run(out: Path, cfg: TeacherConfig, ledger: Ledger, *, confirm: str | None,
                                                threshold=meta["threshold"], translator=translator)
                 else:
                     result = generate_it.process(task, call, generator=translator)
-            except (BudgetError, _Stop) as error:
+            except BudgetError as error:  # stop rigido o chiave rifiutata (401/403)
                 stopped = str(error)
                 break
             handle.write(json.dumps({"key": task["key"], "kind": task["kind"],

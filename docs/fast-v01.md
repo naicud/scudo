@@ -159,7 +159,7 @@ rtk proxy uv run python -m scudo.mix_cli judge-set --ingest /perimetro/ingest \
 rtk proxy uv run python -m scudo.pilot estimate --out /perimetro/judge \
   --teachers /perimetro/teachers.toml --ledger /perimetro/spesa-v0.1.jsonl
 rtk proxy uv run python -m scudo.pilot confirm-volume --ledger /perimetro/spesa-v0.1.jsonl \
-  --teacher <id> --amount <USD> --by "<nome>" --rationale "<perché>"   # per ogni teacher
+  --teacher <id1> --teacher <id2> --amount <USD totali> --by "<nome>" --rationale "<perché>"
 rtk proxy uv run python -m scudo.mix_cli judge --out /perimetro/judge \
   --teachers /perimetro/teachers.toml --ledger /perimetro/spesa-v0.1.jsonl \
   --confirm-spend <confirm della stima>
@@ -177,16 +177,19 @@ rtk proxy uv run --extra train python -m scudo.mix_cli upload --out /perimetro/m
 6. Colab A100: `notebooks/fast_v01.ipynb`, con `mix_revision` e
    `mix_manifest_sha256` del passo 5 in `RUN`.
 
-`judge` rifiuta senza una `volume_confirmation` nel registro
-(`scudo.budget.require_volume_confirmation`) e se un teacher configurato non è
-fra quelli confermati; poi la run del pilot chiede la conferma esatta della stima
-e si ferma al tetto. Gli esiti del pilot (stessa chiave
-`<voce>:<id>:<superficie>`) si possono riusare con `--outcomes`.
+`judge` rifiuta senza una `volume_confirmation` nel registro; poi la run del
+pilot applica `scudo.budget.check_volume`: vale solo l'ultima conferma, ogni
+teacher configurato deve essere nel suo insieme (`--teacher` ripetibile), e la
+stima della run, somma su tutti i teacher, deve stare nel residuo del suo unico
+importo e del tetto. Infine chiede la conferma esatta della stima e si ferma
+all'importo autorizzato. La difficoltà di #8 nasce dal disaccordo fra due
+teacher: si confermano entrambi nella stessa conferma, con un importo che copre
+la somma. Una nuova conferma sostituisce la precedente. Gli esiti del pilot
+(stessa chiave `<voce>:<id>:<superficie>`) si possono riusare con `--outcomes`.
 
-Limiti: la conferma del volume non lega l'importo di una singola run (vale il
-tetto complessivo); il campione da giudicare contiene tutti i candidati, quindi la
-stima del passo 3 va letta prima di confermare; i figli INSUFFICIENT non sono
-deduplicati contro i benchmark (lo sono i loro genitori).
+Limiti: il campione da giudicare contiene tutti i candidati, quindi la stima del
+passo 3 va letta prima di confermare; i figli INSUFFICIENT non sono deduplicati
+contro i benchmark (lo sono i loro genitori).
 
 ## Notebook
 

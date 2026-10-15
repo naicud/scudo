@@ -1,4 +1,6 @@
+import http.client
 import json
+import urllib.request
 
 import pytest
 
@@ -186,6 +188,52 @@ def test_timeout_is_recorded_and_not_retried():
     outcome = judge.judge(MESSAGES)
     assert (outcome.status, outcome.verdict, outcome.prompt_tokens) == ("timeout", None, None)
     assert len(transport.calls) == 1
+
+
+class CutResponse:
+    """Un 200 il cui corpo si interrompe: il provider può averlo già fatturato."""
+
+    status = 200
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *exc):
+        return False
+
+    def read(self):
+        raise http.client.IncompleteRead(b'{"choices": [', 500)
+
+
+def cut_urlopen(request, timeout):
+    return CutResponse()
+
+
+@pytest.mark.parametrize("failure", [
+    None, http.client.BadStatusLine("HTTP/1.1 2x0"), http.client.LineTooLong("header line"),
+    http.client.RemoteDisconnected("closed"),
+])
+def test_broken_http_exchange_is_an_error_outcome_without_usage(monkeypatch, failure):
+    def urlopen(request, timeout):
+        if failure is None:
+            return CutResponse()
+        raise failure
+
+    monkeypatch.setattr(urllib.request, "urlopen", urlopen)
+    outcome = Client(config(), environ={"SCUDO_TEST_KEY": KEY}).judge(MESSAGES)
+    assert (outcome.status, outcome.verdict, outcome.prompt_tokens) == ("error", None, None)
+
+
+def test_error_details_never_carry_the_key_or_key_like_tokens():
+    echoed = (f"Incorrect API key provided: {KEY[:14]}****{KEY[-4:]}. Sent Bearer abc.def.ghi; "
+              "see also sk-proj-AbC123 and hf_XyZ987654")
+    judge, _, _ = client((401, json.dumps({"error": {"message": echoed}}).encode()),
+                         OSError(f"connection refused for {KEY}"))
+    rejected, failed = judge.judge(MESSAGES), judge.judge(MESSAGES)
+    assert rejected.detail.startswith("HTTP 401") and failed.status == "error"
+    for detail in (rejected.detail, failed.detail):
+        for secret in (KEY[:14], KEY[-4:], "abc.def.ghi", "sk-proj-AbC123", "hf_XyZ987654"):
+            assert secret not in detail
 
 
 @pytest.mark.parametrize("response, status", [

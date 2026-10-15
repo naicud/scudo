@@ -4,7 +4,7 @@ Il registro è un JSONL fuori dal repository con una riga per evento:
 `authorisation` (importo confermato dalla persona per una run), `call` (costo di
 una chiamata dall'uso reale di token, o il caso peggiore se il provider non lo
 riporta), `pilot_report` (report del pilot scritto) e `volume_confirmation`
-(conferma umana del teacher e della spesa in volume). Il residuo è il tetto v0.1
+(conferma umana dei teacher e di un solo importo in volume per tutti). Il residuo è il tetto v0.1
 meno la somma delle chiamate; il residuo del volume è l'importo dell'ultima
 conferma meno le chiamate registrate dopo di essa.
 
@@ -13,14 +13,19 @@ tokenizer. Il caso peggiore di una chiamata è la stima dell'ingresso più
 `max_tokens` in uscita; il pilot si ferma prima di una chiamata che potrebbe
 superare l'importo autorizzato. Se l'ingresso reale supera la stima, lo
 sforamento è limitato a quella chiamata.
+
+Ogni run in volume passa da `check_volume`; ogni chiamata a pagamento passa da
+`paid_call`, l'unico posto dove vive la regola di addebito.
 """
 
 import json
 import math
+from collections.abc import Callable, Iterable
 from datetime import UTC, datetime
 from pathlib import Path
 
 from scudo.teacher import CANDIDATES, TeacherConfig
+from scudo.teacher_client import Outcome
 
 CAP_USD = 150.0  # tetto complessivo v0.1 (issue #5)
 CHARS_PER_TOKEN = 4
@@ -29,6 +34,10 @@ _EPS = 1e-9
 
 class BudgetError(RuntimeError):
     """Spesa non autorizzata o oltre il tetto: nessuna chiamata parte."""
+
+
+class KeyRefused(BudgetError):
+    """401/403: chiave o permessi da verificare; la run si ferma senza addebito."""
 
 
 def estimate_tokens(text: str) -> int:
@@ -121,18 +130,52 @@ class Guard:
                             "key": key, "cost_usd": cost, "usage_missing": usage_missing})
 
 
-def confirm_volume(ledger: Ledger, *, teacher: str, amount_usd: float, by: str,
+def paid_call(guard: Guard, cfg: TeacherConfig, key: str, chat: list[dict],
+              send: Callable[[], Outcome]) -> tuple[Outcome, float, bool]:
+    """Una chiamata sotto stop rigido, addebitata con un'unica regola; (esito, costo, uso mancante).
+
+    401/403 fermano la run senza addebito (configurazione, non un esito); un'altra
+    4xx è respinta e costa zero; con l'uso riportato si paga l'uso; senza (timeout,
+    rete, 5xx, corpo troncato, provider muto) il caso peggiore. Se `send` solleva,
+    la richiesta può essere stata elaborata e fatturata: caso peggiore, poi rilancia.
+    """
+    worst = worst_case_usd(cfg, chat)
+    guard.check(worst)
+    try:
+        outcome = send()
+    except BaseException:
+        guard.charge(cfg.model_id, key, worst, usage_missing=True)
+        raise
+    if outcome.http_status in (401, 403):
+        raise KeyRefused(f"{cfg.model_id}: {outcome.detail}; chiave o permessi da verificare")
+    usage_missing = outcome.prompt_tokens is None or outcome.completion_tokens is None
+    rejected = outcome.http_status is not None and 400 <= outcome.http_status < 500
+    cost = 0.0 if rejected else worst if usage_missing else cost_usd(
+        cfg, outcome.prompt_tokens, outcome.completion_tokens)
+    guard.charge(cfg.model_id, key, cost, usage_missing=usage_missing)
+    return outcome, cost, usage_missing
+
+
+def confirm_volume(ledger: Ledger, *, teachers: Iterable[str], amount_usd: float, by: str,
                    rationale: str, cap: float = CAP_USD) -> None:
-    """Registra la scelta del teacher e la spesa in volume: la esegue una persona, mai il codice."""
+    """Registra i teacher scelti e un solo importo per tutti: la esegue una persona, mai il codice."""
+    chosen = sorted(set(teachers))
     if not by.strip() or not rationale.strip():
         raise BudgetError("conferma del volume senza chi e perché")
-    if teacher not in CANDIDATES:
-        raise BudgetError(f"teacher {teacher!r} non nel registro {sorted(CANDIDATES)}")
+    if not chosen:
+        raise BudgetError("conferma del volume senza nessun teacher")
+    if unknown := [t for t in chosen if t not in CANDIDATES]:
+        raise BudgetError(f"teacher {unknown} non nel registro {sorted(CANDIDATES)}")
     if not 0 < amount_usd <= ledger.remaining(cap) + _EPS:
         raise BudgetError(f"importo {amount_usd:.2f} USD fuori dal residuo "
                           f"{ledger.remaining(cap):.2f} USD")
-    ledger.append({"kind": "volume_confirmation", "teacher": teacher, "amount_usd": amount_usd,
+    ledger.append({"kind": "volume_confirmation", "teachers": chosen, "amount_usd": amount_usd,
                    "by": by.strip(), "rationale": rationale.strip()})
+
+
+def confirmed_teachers(confirmation: dict) -> set[str]:
+    """Teacher coperti da una conferma; le conferme scritte prima degli insiemi ne hanno uno."""
+    return set(confirmation.get("teachers") or [confirmation["teacher"]])
 
 
 def require_volume_confirmation(ledger: Ledger) -> dict:
@@ -151,3 +194,26 @@ def volume_remaining(ledger: Ledger) -> float:
     last = max(i for i, r in enumerate(records) if r["kind"] == "volume_confirmation")
     spent = math.fsum(r["cost_usd"] for r in records[last + 1:] if r["kind"] == "call")
     return records[last]["amount_usd"] - spent
+
+
+def check_volume(ledger: Ledger, teachers: Iterable[str], planned_usd: float,
+                 cap: float = CAP_USD) -> dict:
+    """Controllo di ogni run in volume, prima di qualsiasi chiamata; restituisce l'ultima conferma.
+
+    Vale solo l'ultima conferma: ogni teacher della run deve essere fra i suoi, e la
+    stima della run (somma su tutti i teacher) arrotondata al centesimo deve stare nel
+    residuo del volume confermato e del tetto.
+    """
+    confirmation = require_volume_confirmation(ledger)
+    covered = confirmed_teachers(confirmation)
+    if others := sorted(set(teachers) - covered):
+        raise BudgetError(f"teacher senza conferma del volume: {others}; l'ultima conferma vale "
+                          f"solo per i teacher confermati {sorted(covered)}")
+    amount = cents_up(planned_usd)
+    if amount > (left := volume_remaining(ledger)) + _EPS:
+        raise BudgetError(f"stima {amount:.2f} USD oltre il residuo {left:.2f} USD "
+                          "del volume confermato")
+    if amount > (left := ledger.remaining(cap)) + _EPS:
+        raise BudgetError(f"stima {amount:.2f} USD oltre il residuo {left:.2f} USD "
+                          f"del tetto v0.1 di {cap:.2f} USD")
+    return confirmation

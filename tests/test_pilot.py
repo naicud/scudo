@@ -1,15 +1,16 @@
 import json
+import urllib.request
 from dataclasses import replace
 
 import pytest
 
-from scudo import aegis, nemotron, pilot
+from scudo import aegis, budget, nemotron, pilot
 from scudo.budget import BudgetError, Ledger
 from scudo.ingest import REPO_ROOT
 from scudo.pilot_sample import allocate, build_sample
 from scudo.teacher import parse_configs
 from test_manifest import BENCH, TRAIN
-from test_teacher import CONFIG
+from test_teacher import CONFIG, cut_urlopen
 
 AEGIS = replace(TRAIN, name="aegis2-train", id=aegis.DATASET, surfaces=("prompt", "response"))
 NEMO_TEST = replace(BENCH, name="nemotron3-test", id=nemotron.DATASET, languages=("it", "en"),
@@ -256,6 +257,30 @@ def test_rejected_request_is_an_error_outcome_that_costs_nothing(tmp_path):
     assert {(o["status"], o["verdict"]) for o in pilot.read_outcomes(out)} == {("error", None)}
 
 
+def test_cut_body_after_200_is_charged_at_worst_case_and_recorded(tmp_path, monkeypatch):
+    out, configs, ledger = prepared(tmp_path)
+    estimate = pilot.estimate(out, configs, ledger)
+    monkeypatch.setattr(urllib.request, "urlopen", cut_urlopen)  # trasporto reale, rete finta
+    result = pilot.run(out, configs, ledger, confirm=estimate["confirm"], environ=ENV,
+                       sleep=lambda s: None)
+    assert result["done"] == 40 and result["stopped"] is None
+    assert ledger.spent() == pytest.approx(estimate["total_usd"])
+    assert {(o["status"], o["usage_missing"]) for o in pilot.read_outcomes(out)} == {("error", True)}
+
+
+def test_volume_run_stays_within_the_confirmed_amount_and_teacher(tmp_path):
+    out, configs, ledger = prepared(tmp_path)
+    gpt = configs[:1]
+    budget.confirm_volume(ledger, teachers=[gpt[0].model_id], amount_usd=0.01, by="Mario",
+                          rationale="volume minimo")
+    transport = Transport()
+    with pytest.raises(BudgetError, match="volume confermato"):
+        run(out, gpt, ledger, pilot.estimate(out, gpt, ledger)["confirm"], transport)
+    with pytest.raises(BudgetError, match="senza conferma del volume"):
+        run(out, configs, ledger, pilot.estimate(out, configs, ledger)["confirm"], transport)
+    assert transport.calls == 0 and not ledger.of_kind("authorisation")
+
+
 def toml(tables):
     def value(v):
         return json.dumps(v) if isinstance(v, str) else repr(v)
@@ -275,3 +300,16 @@ def test_cli_dry_run_then_refused_run(tmp_path, capsys, monkeypatch):
     assert pilot.main(["run", *common]) == 1
     assert "--confirm-spend" in capsys.readouterr().err
     assert not (out / "outcomes.jsonl").exists()
+
+
+def test_cli_confirms_one_amount_for_a_set_of_teachers(tmp_path, capsys):
+    path = tmp_path / "l.jsonl"
+    common = ["confirm-volume", "--ledger", str(path), "--amount", "20", "--by", "Mario",
+              "--rationale", "giuria di due teacher (#8)"]
+    assert pilot.main([*common, "--teacher", CONFIG["model_id"], "--teacher", "org/unknown"]) == 1
+    assert "org/unknown" in capsys.readouterr().err and not Ledger(path).records()
+    assert pilot.main([*common, "--teacher", CONFIG["model_id"],
+                       "--teacher", QWEN["model_id"]]) == 0
+    [record] = Ledger(path).of_kind("volume_confirmation")
+    assert record["teachers"] == sorted([CONFIG["model_id"], QWEN["model_id"]])
+    assert record["amount_usd"] == 20.0
