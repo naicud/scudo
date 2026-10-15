@@ -268,7 +268,8 @@ print("global_step finale:", trainer.state.global_step)"""
 
 EVAL = """\
 import torch
-from huggingface_hub import HfApi
+import unsloth
+from huggingface_hub import HfApi, hf_hub_download, list_repo_files
 from pathlib import Path
 
 from scudo.artifacts import ArtifactIdentity, file_sha256
@@ -302,18 +303,28 @@ for row in held_rows:
         letter_logits = [float(x) for x in logits.float()[letter_ids].cpu()]
         readout = read_options(letter_logits, row["semantic_ids"])
     except Exception as exc:  # un readout fallito resta un errore, mai NO_VIOLATION
-        results.append(EvalResult(case_id, row["language"], row["verdict"], None,
-                                  error=type(exc).__name__))
+        results.append(EvalResult(case_id, row["language"], row["surface"], row["verdict"],
+                                  None, error=type(exc).__name__))
         continue
-    results.append(EvalResult(case_id, row["language"], row["verdict"], readout))
+    results.append(EvalResult(case_id, row["language"], row["surface"], row["verdict"], readout))
     readouts[case_id] = {
         "prompt": row["prompt"],
         "semantic_ids": row["semantic_ids"],
         "logits": list(readout.logits),
     }
 
+# Pesi che determinano i readout: shard della base alla revisione fissata e adapter.
+base_weights = [
+    ArtifactIdentity(RUN["base_model"], RUN["base_revision"], name, file_sha256(Path(
+        hf_hub_download(RUN["base_model"], name, revision=RUN["base_revision"])
+    )))
+    for name in sorted(list_repo_files(RUN["base_model"], revision=RUN["base_revision"]))
+    if name.endswith(".safetensors") and "/" not in name
+]
 report = build_report(
-    results, proof_type="local", model=adapter_identity,
+    results, proof_type="local", model=f"{RUN['base_model']}+{CKPT}/adapter",
+    weights=[*base_weights, adapter_identity], scudo_sha=RUN_LOG["scudo_sha"],
+    runtime={"name": "unsloth", "version": unsloth.__version__},
     split="nemotron-v3-test-heldout", harness="scudo.notebook/fast_tracer",
 )
 REPORT_DIR = Path("/content/reports")

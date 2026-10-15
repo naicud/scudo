@@ -44,6 +44,11 @@ def test_notebook_pins_inputs_and_resumes_from_hub_checkpoints():
     assert "RUN_FINGERPRINT" in text
     assert "except Exception" in text  # un readout fallito non interrompe l'eval
     assert "load_verified" in text  # il GGUF esportato si rilegge solo dopo il digest
+    # Il report dichiara superficie, pesi con digest, SHA di scudo e runtime.
+    assert 'row["surface"], row["verdict"]' in text
+    assert "weights=[*base_weights, adapter_identity]" in text
+    assert 'scudo_sha=RUN_LOG["scudo_sha"]' in text
+    assert "runtime=" in text
 
 
 def test_notebook_never_embeds_tokens():

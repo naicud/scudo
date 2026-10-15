@@ -1,27 +1,40 @@
+import json
+import math
+
 import pytest
 
 from scudo.artifacts import ArtifactIdentity
+from scudo.baselines import LabelReadout
 from scudo.eval_report import EvalResult, build_report
 from scudo.protocol import FORMAT_VERSION, read_options
 
 CANON = ("VIOLATION", "NO_VIOLATION", "INSUFFICIENT")
 MODEL = ArtifactIdentity("naicud/scudo-fast-4b-GGUF", "0" * 40, "m.gguf", "a" * 64)
+SHA = "1" * 40
+RUNTIME = {"name": "llama.cpp", "version": "b11081"}
 
 
-def result(language, gold, predicted):
+def result(language, gold, predicted, surface="prompt"):
     logits = tuple(3.0 if key == predicted else 0.0 for key in CANON)
-    return EvalResult(case_id=f"{language}-{gold}-{predicted}", language=language, gold=gold,
-                      readout=read_options(logits, CANON))
+    return EvalResult(f"{language}-{surface}-{gold}-{predicted}", language, surface, gold,
+                      read_options(logits, CANON))
 
 
-def failed(language, gold):
-    return EvalResult(case_id=f"{language}-fail", language=language, gold=gold, readout=None,
+def with_probs(gold, probs, surface="prompt", language="en"):
+    return EvalResult(f"{gold}-{probs}", language, surface, gold,
+                      read_options([math.log(p) for p in probs], CANON))
+
+
+def failed(language, gold, surface="prompt"):
+    return EvalResult(f"{language}-{surface}-fail", language, surface, gold, None,
                       error="READOUT_INVALID")
 
 
-def build(results, proof="local"):
-    return build_report(results, proof_type=proof, model=MODEL, split="nemotron-v3-heldout",
-                        harness="scudo.eval/1")
+def build(results, proof="local", weights=(MODEL,), **overrides):
+    args = dict(proof_type=proof, model="naicud/scudo-fast-4b", weights=list(weights),
+                scudo_sha=SHA, runtime=RUNTIME, split="nemotron-v3-heldout",
+                harness="scudo.eval/1")
+    return build_report(results, **{**args, **overrides})
 
 
 def test_report_groups_metrics_by_language_and_overall():
@@ -39,12 +52,60 @@ def test_report_groups_metrics_by_language_and_overall():
     assert report["by_language"]["it"]["precision"]["VIOLATION"] == pytest.approx(0.5)
 
 
-def test_report_declares_proof_type_model_and_format():
+def test_report_groups_metrics_by_surface():
+    report = build([
+        result("en", "VIOLATION", "VIOLATION", surface="prompt"),
+        result("en", "VIOLATION", "NO_VIOLATION", surface="injection_indirect"),
+    ])
+    assert set(report["by_surface"]) == {"prompt", "injection_indirect"}
+    assert report["by_surface"]["prompt"]["accuracy"] == pytest.approx(1.0)
+    assert report["by_surface"]["injection_indirect"]["accuracy"] == pytest.approx(0.0)
+
+
+def test_f1_per_verdict_is_harmonic_mean_and_null_without_denominator():
+    report = build([
+        result("it", "VIOLATION", "VIOLATION"),
+        result("it", "NO_VIOLATION", "VIOLATION"),
+        result("it", "VIOLATION", "NO_VIOLATION"),
+    ])
+    f1 = report["overall"]["f1"]
+    # VIOLATION: precision 1/2, recall 1/2.
+    assert f1["VIOLATION"] == pytest.approx(0.5)
+    # NO_VIOLATION: precision 0/1, recall 0/1.
+    assert f1["NO_VIOLATION"] == pytest.approx(0.0)
+    assert f1["INSUFFICIENT"] is None
+
+
+def test_report_header_declares_identity_runtime_and_proof():
     report = build([result("en", "VIOLATION", "VIOLATION")], proof="live")
     assert report["proof_type"] == "live"
-    assert report["model"] == MODEL.manifest_entry()
+    assert report["model"] == "naicud/scudo-fast-4b"
+    assert report["weights"] == [MODEL.manifest_entry()]
+    assert report["scudo_sha"] == SHA
+    assert report["runtime"] == RUNTIME
     assert report["format"] == FORMAT_VERSION
     assert report["split"] == "nemotron-v3-heldout"
+    assert report["harness"] == "scudo.eval/1"
+    json.dumps(report)  # il report è serializzabile così com'è
+
+
+def test_report_header_rejects_missing_or_malformed_identity():
+    ok = [result("en", "VIOLATION", "VIOLATION")]
+    with pytest.raises(ValueError):
+        build(ok, scudo_sha="main")
+    with pytest.raises(ValueError):
+        build(ok, runtime={"name": "transformers"})
+    with pytest.raises(ValueError):
+        build(ok, runtime={"name": "", "version": "5.17.0"})
+    with pytest.raises(ValueError):
+        build(ok, weights=())
+
+
+def test_baseline_report_declares_its_own_prompt_format():
+    report = build([result("en", "VIOLATION", "VIOLATION")], proof="reference",
+                   format="spark-decisions-v3")
+    assert report["proof_type"] == "reference"
+    assert report["format"] == "spark-decisions-v3"
 
 
 def test_failed_readout_is_an_error_never_a_no_violation():
@@ -54,6 +115,62 @@ def test_failed_readout_is_an_error_never_a_no_violation():
     assert it["accuracy"] == pytest.approx(0.5)
     assert it["confusion"]["NO_VIOLATION"]["NO_VIOLATION"] == 1
     assert it["confusion"]["NO_VIOLATION"]["ERROR"] == 1
+
+
+def test_calibration_is_top_label_ece_with_ten_bins_and_multiclass_brier():
+    report = build([
+        with_probs("VIOLATION", (0.9, 0.05, 0.05)),  # corretto, confidenza 0.9
+        with_probs("NO_VIOLATION", (0.6, 0.3, 0.1)),  # sbagliato, confidenza 0.6
+    ])
+    calibration = report["overall"]["calibration"]
+    assert calibration["cases"] == 2
+    assert calibration["bins"] == 10
+    assert calibration["ece"] == pytest.approx(0.5 * 0.1 + 0.5 * 0.6)
+    brier_a = 0.1 ** 2 + 0.05 ** 2 + 0.05 ** 2
+    brier_b = 0.6 ** 2 + 0.7 ** 2 + 0.1 ** 2
+    assert calibration["brier"] == pytest.approx((brier_a + brier_b) / 2)
+
+
+def test_calibration_skips_errors_and_readouts_without_probabilities():
+    text_only = EvalResult("t", "en", "prompt", "VIOLATION",
+                           LabelReadout("unsafe", "VIOLATION", None, None))
+    report = build([text_only, failed("en", "VIOLATION")])
+    assert report["overall"]["calibration"] is None
+    assert report["overall"]["accuracy"] == pytest.approx(0.5)
+    mixed = build([text_only, with_probs("VIOLATION", (0.9, 0.05, 0.05))])
+    assert mixed["overall"]["calibration"]["cases"] == 1
+
+
+def test_binary_label_readout_puts_zero_mass_on_insufficient():
+    binary = EvalResult("b", "en", "prompt", "NO_VIOLATION",
+                        LabelReadout("yes", "VIOLATION", (0.8, 0.2, 0.0), 1.386))
+    calibration = build([binary])["overall"]["calibration"]
+    assert calibration["ece"] == pytest.approx(0.8)
+    assert calibration["brier"] == pytest.approx(0.8 ** 2 + 0.8 ** 2)
+
+
+def test_over_refusal_rate_counts_violations_on_benign_over_refusal_cases():
+    report = build([
+        result("en", "NO_VIOLATION", "VIOLATION", surface="over_refusal"),
+        result("en", "NO_VIOLATION", "NO_VIOLATION", surface="over_refusal"),
+        result("en", "NO_VIOLATION", "INSUFFICIENT", surface="over_refusal"),
+        result("en", "NO_VIOLATION", "VIOLATION", surface="over_refusal"),
+        failed("en", "NO_VIOLATION", surface="over_refusal"),
+        # Fuori dalla definizione: altra superficie o gold diverso.
+        result("en", "NO_VIOLATION", "VIOLATION", surface="prompt"),
+        result("en", "VIOLATION", "VIOLATION", surface="over_refusal"),
+    ])
+    over = report["overall"]["over_refusal"]
+    assert over["cases"] == 5
+    assert over["errors"] == 1
+    assert over["rate"] == pytest.approx(2 / 4)
+    assert over["insufficient_rate"] == pytest.approx(1 / 4)
+    assert report["by_surface"]["prompt"]["over_refusal"] is None
+
+
+def test_over_refusal_rate_is_null_when_every_case_failed():
+    over = build([failed("en", "NO_VIOLATION", surface="over_refusal")])["overall"]["over_refusal"]
+    assert over == {"cases": 1, "errors": 1, "rate": None, "insufficient_rate": None}
 
 
 def test_unknown_proof_type_is_rejected():
@@ -96,13 +213,22 @@ def test_consistency_fails_on_drift_or_missing_cases():
 def test_eval_result_requires_exactly_one_of_readout_and_error():
     ok = result("it", "VIOLATION", "VIOLATION")
     with pytest.raises(ValueError):
-        EvalResult("x", "it", "VIOLATION", readout=None)
+        EvalResult("x", "it", "prompt", "VIOLATION", readout=None)
     with pytest.raises(ValueError):
-        EvalResult("x", "it", "VIOLATION", readout=ok.readout, error="BOOM")
+        EvalResult("x", "it", "prompt", "VIOLATION", readout=ok.readout, error="BOOM")
 
 
-def test_live_proof_requires_a_gguf_identity():
+def test_eval_result_rejects_unknown_surface_or_language():
+    ok = result("it", "VIOLATION", "VIOLATION")
+    with pytest.raises(ValueError):
+        EvalResult("x", "it", "input", "VIOLATION", readout=ok.readout)
+    with pytest.raises(ValueError):
+        EvalResult("x", "fr", "prompt", "VIOLATION", readout=ok.readout)
+
+
+def test_live_proof_requires_gguf_weights_only():
     adapter = ArtifactIdentity("naicud/x", "0" * 40, "adapter_model.safetensors", "a" * 64)
     with pytest.raises(ValueError):
-        build_report([result("en", "VIOLATION", "VIOLATION")], proof_type="live", model=adapter,
-                     split="s", harness="h")
+        build([result("en", "VIOLATION", "VIOLATION")], proof="live", weights=[adapter])
+    with pytest.raises(ValueError):
+        build([result("en", "VIOLATION", "VIOLATION")], proof="live", weights=[MODEL, adapter])

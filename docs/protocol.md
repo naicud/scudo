@@ -148,18 +148,21 @@ non verificato.
 
 ## Report di eval
 
-`build_report` produce il report. Campi: `proof_type`, `model` (identità del
-manifest), `format`, `split`, `harness`, `overall`, `by_language`.
+`build_report` produce il report. Intestazione: `proof_type`, `model` (nome),
+`weights` (identità del manifest di ogni file di pesi), `scudo_sha`, `runtime`
+(`name`, `version`), `format`, `split`, `harness`. Metriche: `overall`,
+`by_language`, `by_surface`.
 
 `proof_type` è uno fra:
 
 - `local`: checkpoint in training;
-- `live`: GGUF nel backend nativo.
+- `live`: GGUF nel backend nativo;
+- `reference`: pesi pubblicati, nostri o di una baseline, nel runtime di
+  riferimento della card (transformers o il runtime della card, su Colab).
 
-Ogni metrica riporta casi, errori, accuratezza, recall e precision per verdetto,
-e la matrice di confusione con una colonna `ERROR`. Un readout fallito conta
-come errore e come sbaglio nell'accuratezza. Recall e precision sono `null`
-quando il denominatore è zero.
+Ogni gruppo riporta casi, errori, accuratezza, recall, precision e F1 per
+verdetto, la matrice di confusione con una colonna `ERROR`, la calibrazione e
+l'over-refusal. Definizioni in [`eval.md`](eval.md).
 
 Il confronto fra checkpoint e GGUF usa `compare_readouts(local, live, tolerance=...)`:
 
