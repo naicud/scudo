@@ -6,7 +6,8 @@ import pytest
 HEAVY_MODULES = ("torch", "unsloth", "transformers", "datasets", "huggingface_hub")
 
 
-@pytest.mark.parametrize("module", ["scudo", "scudo.ingest"])
+@pytest.mark.parametrize("module", ["scudo", "scudo.ingest", "scudo.pilot", "scudo.pilot_report",
+                                    "scudo.teacher_client"])
 def test_import_does_not_load_training_stack(module):
     probe = (
         f"import sys, {module}\n"
