@@ -253,24 +253,6 @@ codice** e un test li confronta con il generatore: non si modificano a mano.
 | [`docs/research/`](docs/research/) | ricerche su candidati, dataset e provider |
 | [`docs/templates/`](docs/templates/) | template di data card e model card |
 
-## Roadmap
-
-| Issue | Cosa | Stato |
-| --- | --- | --- |
-| [#1](https://github.com/naicud/scudo/issues/1) | Scheletro del repository | chiusa |
-| [#2](https://github.com/naicud/scudo/issues/2) | Tracer: Fast 4B da 2k casi fino al GGUF | aperta: run `local` fatto, manca il confronto live |
-| [#3](https://github.com/naicud/scudo/issues/3) | Ingestione con manifest, cancello e deduplica | aperta: codice su `main`, decisioni di licenza registrate, manifest ammesso; manca la build reale verificata |
-| [#4](https://github.com/naicud/scudo/issues/4) | Harness di eval con le baseline | aperta: codice e notebook pronti, nessun modello eseguito |
-| [#5](https://github.com/naicud/scudo/issues/5) | Pilot di due teacher su 500 casi gold | aperta: codice pronto, nessuna chiamata a pagamento |
-| [#6](https://github.com/naicud/scudo/issues/6) | Criteri personalizzati e casi `INSUFFICIENT` | chiusa |
-| [#7](https://github.com/naicud/scudo/issues/7) | Dati italiani e misti con spot-check | aperta: pipeline su `main`, nessuna run reale |
-| [#8](https://github.com/naicud/scudo/issues/8) | Fast v0.1: mix completo e criterio di difficoltà | aperta: mix e notebook su `main`, training non eseguito |
-| [#9](https://github.com/naicud/scudo/issues/9) | Accurate v0.1 sui ragionamenti | aperta: formato, dati e notebook su `main`, training non eseguito |
-| [#10](https://github.com/naicud/scudo/issues/10) | Release v0.1-preview su Hugging Face e GitHub | aperta |
-| [#11](https://github.com/naicud/scudo/issues/11) | Gold set italiano nativo da 500 item | aperta, scritto a mano |
-| [#12](https://github.com/naicud/scudo/issues/12) | Difficoltà al secondo giro con errori cross-fold | aperta |
-| [#13](https://github.com/naicud/scudo/issues/13) | GRPO dell'Accurate | aperta |
-
 ## Contribuire
 
 Le regole di lavoro (comandi di verifica, confini del sensore, limiti di
