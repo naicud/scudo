@@ -1,7 +1,10 @@
 # Data card: `<owner/dataset>`
 
 Una data card per ogni dataset che entra nel training o nell'eval. Un dataset
-senza data card completa non entra nel manifest.
+senza data card completa non entra nel manifest. I campi stanno nella voce di
+`src/scudo/manifest.toml`; `python -m scudo.ingest cards --out DIR` genera la
+card con questo schema e `build` aggiunge i conteggi (vedi
+[docs/datasets.md](../datasets.md)).
 
 ## Fonte
 

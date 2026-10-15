@@ -1,0 +1,712 @@
+# Manifest dei dataset di Scudo: solo metadati, mai dati.
+#
+# Ogni voce è una data card in forma di dati (vedi docs/datasets.md). Revisione,
+# licenza, gating e generatori sono stati letti il 2026-10-15 dall'API di
+# Hugging Face (/api/datasets/<id> e /revision/main), dal README grezzo, dallo
+# schema di datasets-server (first-rows) e, dove citato, dal paper. I modelli
+# generatori hanno la licenza letta da /api/models/<id>.
+#
+# `generator_terms`: SÌ / NO / INCERTO dopo i filtri della voce. INCERTO blocca
+# il training finché una persona non aggiunge una tabella `decision` con `by`,
+# `on` e `rationale`: il codice e gli agenti non la compilano mai.
+# `role = "benchmark"`: solo valutazione, deduplicato contro il training.
+
+version = "2026-10-15"
+
+# --- Training: richieste e risposte dannose ---------------------------------
+
+[[dataset]]
+name = "aegis2-train"
+id = "nvidia/Aegis-AI-Content-Safety-Dataset-2.0"
+role = "train"
+revision = "d86bb8bedff51d25ac834ab7838f1cc61acb7a2c"
+read_on = "2026-10-15"
+config = "default"
+splits = ["train"]
+languages = ["en"]
+surfaces = ["prompt", "response"]
+license = "cc-by-4.0"
+license_source = "API cardData.license e README («License: CC-BY-4.0»)"
+gated = false
+texts_by = "prompt umani da Anthropic/hh-rlhf (mit, rev 09be8c5bbc57cb3887f3a9732ad6aa7ec602a1fa); risposte di mistralai/Mistral-7B-v0.1; 5.000 rifiuti generati con Gemma-2-27B (file refusals_train.json)"
+labels_by = "prompt_label: umani (prompt_label_source sempre human); response_label: human, llm_jury o refusal_data_augmentation"
+generators = [
+  "mistralai/Mistral-7B-v0.1 (apache-2.0): risposte",
+  "mistralai/Mixtral-8x22B-v0.1 (apache-2.0): giuria llm_jury",
+  "nvidia/Mistral-NeMo-12B-Instruct (apache-2.0): giuria llm_jury",
+  "google/gemma-2-27b-it (gemma, gated manual): giuria llm_jury e rifiuti refusal_data_augmentation",
+  "mistralai/Mixtral-8x7B-v0.1: dati topic-following citati dal README per il training del modello NVIDIA; presenza in questo dataset NON VERIFICATA",
+]
+generator_terms = "SÌ"
+generator_terms_note = "Dopo i filtri: le righe refusal_data_augmentation (Gemma) escono per intero; le label llm_jury, con Gemma-2-27B in giuria, non sono gold e sono marcate needs_relabel per la giuria di teacher. Restano prompt umani (MIT), risposte Mistral-7B-v0.1 (apache-2.0) e label umane."
+filters = [
+  "righe con response_label_source = refusal_data_augmentation escluse per intero",
+  "prompt REDACTED (Suicide Detection, non distribuiti) esclusi",
+  "label llm_jury marcate needs_relabel: non entrano come gold prima della rietichettatura",
+  "risposta senza testo o senza label: solo il caso prompt",
+  "deduplica esatta e near-duplicate contro tutti i benchmark del manifest",
+]
+title = "Nemotron Content Safety Dataset V2 (Aegis AI Content Safety Dataset 2.0)"
+authors = "NVIDIA; Ghosh, S., Varshney, P., Sreedhar, M. N., Padmakumar, A., Rebedea, T., Varghese, J. R., Parisien, C., «AEGIS2.0: A Diverse AI Safety Dataset and Risks Taxonomy for Alignment of LLM Guardrails», NAACL 2025"
+url = "https://huggingface.co/datasets/nvidia/Aegis-AI-Content-Safety-Dataset-2.0"
+changes = "selezione dello split train; esclusione dei rifiuti refusal_data_augmentation e dei prompt REDACTED; label safe/unsafe mappate su NO_VIOLATION/VIOLATION; un caso per prompt e uno per risposta con criterio testuale; marcatura delle label llm_jury; deduplica contro i benchmark; testi invariati, inseriti nel template del protocollo"
+risks = [
+  "contenuti dannosi per costruzione",
+  "label llm_jury rumorose fino alla rietichettatura",
+  "il README dichiara i dati non pensati per addestrare agenti di dialogo: Scudo addestra un sensore",
+  "Nemotron v3 e Nemotron-Content-Safety-Reasoning riusano le stesse righe (stessi id)",
+]
+
+[[dataset]]
+name = "aegis1-train"
+id = "nvidia/Aegis-AI-Content-Safety-Dataset-1.0"
+role = "train"
+revision = "bd96d862068e47630197de64eb91f8d1481ff3e0"
+read_on = "2026-10-15"
+config = "default"
+splits = ["train"]
+languages = ["en"]
+surfaces = ["prompt", "response"]
+license = "cc-by-4.0"
+license_source = "API cardData.license e README («License: CC-BY-4.0»)"
+gated = false
+texts_by = "prompt umani da Anthropic/hh-rlhf (mit); risposte di mistralai/Mistral-7B-v0.1; colonne text e text_type (user_message, llm_response, combined)"
+labels_by = "umani: 12 annotatori e 2 persone di quality assurance NVIDIA (labels_0..labels_4)"
+generators = ["mistralai/Mistral-7B-v0.1 (apache-2.0): risposte"]
+generator_terms = "SÌ"
+generator_terms_note = "Testi umani e Mistral-7B-v0.1 (apache-2.0), label umane."
+filters = [
+  "label a livello di dialogo: valide per il prompt solo se il dialogo è un solo prompt (README)",
+  "deduplica contro Aegis 2.0 e contro tutti i benchmark del manifest",
+]
+title = "Nemotron Content Safety Dataset V1 (Aegis AI Content Safety Dataset 1.0)"
+authors = "NVIDIA; Ghosh, S., Varshney, P., Galinkin, E., Parisien, C., «AEGIS: Online Adaptive AI Content Safety Moderation with Ensemble of LLM Experts»"
+url = "https://huggingface.co/datasets/nvidia/Aegis-AI-Content-Safety-Dataset-1.0"
+changes = "nessun convertitore ancora: mappatura delle categorie su VIOLATION/NO_VIOLATION da definire"
+risks = ["contenuti dannosi", "sovrapposto ad Aegis 2.0 (stessa origine HH-RLHF)", "label Needs Caution senza corrispondenza binaria"]
+
+[[dataset]]
+name = "nemotron3-train"
+id = "nvidia/Nemotron-Safety-Guard-Dataset-v3"
+role = "train"
+revision = "a3f7ecb3433d1933701a83f18de16c36934a7f51"
+read_on = "2026-10-15"
+config = "default"
+splits = ["train"]
+languages = ["it", "en"]
+surfaces = ["prompt", "response"]
+license = "cc-by-4.0"
+license_source = "API cardData.license e README (License/Terms of Use)"
+gated = false
+texts_by = "pipeline CultureGuard su Aegis 2.0: adattamento culturale con Mixtral-8x22B, traduzione con Google Translate (GCP), prompt jailbreaking sintetici (paper arXiv:2508.01710)"
+labels_by = "prompt_label_source e response_label_source: human, llm_jury, refusal_data_augmentation; giuria CultureGuard: Llama-Nemotron-Safety-Guard-V2, PolyGuard-Qwen, Llama-3.1-Nemotron-70B-Instruct, Qwen3-235B-A22B (paper)"
+generators = [
+  "mistralai/Mixtral-8x22B-v0.1 (apache-2.0): adattamento culturale",
+  "Google Translate / GCP: traduzione; termini per questo uso NON VERIFICATI",
+  "Llama-3.1-Nemotron-70B-Instruct (licenza Llama 3.1): classificazione culturale e giuria",
+  "Llama-Nemotron-Safety-Guard-V2 (base Llama 3.1): giuria",
+  "PolyGuard-Qwen: giuria; licenza NON VERIFICATA",
+  "Qwen3-235B-A22B: giuria; licenza NON VERIFICATA",
+  "modello dei prompt jailbreaking sintetici: NON VERIFICATO",
+  "Gemma-2-27B: righe refusal_data_augmentation ereditate da Aegis 2.0",
+]
+generator_terms = "INCERTO"
+generator_terms_note = "La licenza Llama 3.1 vincola i modelli addestrati con i suoi output (nome con prefisso «Llama»); i termini di Google Translate e le licenze di PolyGuard-Qwen, Qwen3-235B e del generatore dei jailbreak non sono verificati. Serve una decisione umana."
+filters = [
+  "lingue it e en",
+  "righe refusal_data_augmentation escluse per intero",
+  "prompt REDACTED esclusi",
+  "label llm_jury marcate needs_relabel",
+  "deduplica contro tutti i benchmark del manifest",
+]
+title = "Nemotron-Safety-Guard-Dataset-v3 (CultureGuard)"
+authors = "NVIDIA; Joshi, R., Paul, R., Singla, K., Kamath, A., Evans, M., Luna, K., Ghosh, S., Vaidya, U., Long, E., Chauhan, S. S., et al., «CultureGuard: Towards Culturally-Aware Dataset and Guard Model for Multilingual Safety Applications», arXiv:2508.01710"
+url = "https://huggingface.co/datasets/nvidia/Nemotron-Safety-Guard-Dataset-v3"
+changes = "selezione delle righe it/en; esclusione dei rifiuti refusal_data_augmentation e dei prompt REDACTED; label mappate su VIOLATION/NO_VIOLATION; casi prompt e risposta; marcatura llm_jury; deduplica contro i benchmark"
+risks = [
+  "italiano tradotto a macchina, non nativo",
+  "label llm_jury: 26% dei prompt e 78% delle risposte etichettate del train",
+  "le righe del test hanno gli stessi id del test di Aegis 2.0",
+]
+
+[[dataset]]
+name = "nemotron-sft-safety-v2"
+id = "nvidia/Nemotron-SFT-Safety-v2"
+role = "train"
+revision = "8a40a63c9a1a340874b874f980953be53bff0a07"
+read_on = "2026-10-15"
+config = "default"
+splits = ["train"]
+languages = ["en", "it"]
+surfaces = ["prompt", "injection_direct", "over_refusal"]
+license = "cc-by-4.0"
+license_source = "README («governed by ... CC BY 4.0»; «Additional Information: Apache 2.0 License; MIT License»); API cardData.license = [cc-by-4.0, apache-2.0, mit]"
+gated = false
+texts_by = "prompt da Aegis 2.0, gretel-safety-alignment-en-v1, notadib/harmful-tasks (mit) e sottoinsiemi sintetici sdg_*; risposte rigenerate; traduzione IT con nvidia/Riva-Translate-4B-Instruct-v1.1"
+labels_by = "nessuna label guard per riga: messages, prompt_source, response_policy"
+generators = [
+  "modelli delle risposte e dei prompt sdg_*: NON VERIFICATI (il README non li nomina)",
+  "nvidia/Riva-Translate-4B-Instruct-v1.1 (nvidia-community-model-license): traduzione; termini sugli output NON VERIFICATI",
+]
+generator_terms = "INCERTO"
+generator_terms_note = "I modelli che hanno generato risposte e prompt sintetici non sono dichiarati; i termini della licenza community NVIDIA sugli output del traduttore non sono verificati."
+filters = ["label da ricostruire con la giuria di teacher", "deduplica contro tutti i benchmark del manifest"]
+title = "Nemotron-SFT-Safety-v2"
+authors = "NVIDIA Corporation"
+url = "https://huggingface.co/datasets/nvidia/Nemotron-SFT-Safety-v2"
+changes = "nessun convertitore ancora"
+risks = ["dati SFT di allineamento, non di classificazione", "italiano tradotto a macchina", "prompt condivisi con Aegis 2.0 e Gretel"]
+
+[[dataset]]
+name = "aya-redteaming-en"
+id = "CohereLabs/aya_redteaming"
+role = "train"
+revision = "5a16fee03c19d681b4f3527b6a750e1ed4d434c7"
+read_on = "2026-10-15"
+config = "default"
+splits = ["train"]
+languages = ["en"]
+surfaces = ["prompt"]
+license = "apache-2.0"
+license_source = "API cardData.license e README («can be used for any purpose, whether academic or commercial»)"
+gated = false
+texts_by = "annotatori professionisti retribuiti (README); file aya_eng.jsonl"
+labels_by = "umani: harm_category, global_or_local"
+generators = ["nessun modello dichiarato"]
+generator_terms = "SÌ"
+generator_terms_note = "Testi e label umani."
+filters = ["solo aya_eng.jsonl (nessun file italiano)", "solo prompt dannosi: servono negativi da altre fonti", "deduplica contro tutti i benchmark del manifest"]
+title = "Aya Red-teaming"
+authors = "Aakanksha, Ahmadian, A., Ermis, B., Goldfarb-Tarrant, S., Kreutzer, J., Fadaee, M., Hooker, S., «The Multilingual Alignment Prism: Aligning Global and Local Preferences to Reduce Harm»"
+url = "https://huggingface.co/datasets/CohereLabs/aya_redteaming"
+changes = "nessun convertitore ancora"
+risks = ["solo positivi", "rinominato da CohereForAI/aya_redteaming (stesso commit)"]
+
+[[dataset]]
+name = "gretel-safety-alignment"
+id = "gretelai/gretel-safety-alignment-en-v1"
+role = "train"
+revision = "7f220b493d7027919d9d4489b43ca2f75fb6f718"
+read_on = "2026-10-15"
+config = "default"
+splits = ["train"]
+languages = ["en"]
+surfaces = ["prompt", "response"]
+license = "apache-2.0"
+license_source = "README («released under the Apache 2.0 License»); API cardData.license assente"
+gated = false
+texts_by = "Gretel Navigator con ibm-granite/granite-3.0-8b(-instruct), Qwen/Qwen2.5-7B(-Instruct), mistralai/Mistral-Nemo-Instruct-2407"
+labels_by = "punteggi del giudice (judge_response_score) e probabilità di danno di ibm-granite/granite-guardian-3.0-2b"
+generators = [
+  "ibm-granite/granite-3.0-8b-instruct e -base (apache-2.0)",
+  "Qwen/Qwen2.5-7B e -Instruct (apache-2.0)",
+  "mistralai/Mistral-Nemo-Instruct-2407 (apache-2.0)",
+  "ibm-granite/granite-guardian-3.0-2b (apache-2.0): probabilità di danno",
+]
+generator_terms = "SÌ"
+generator_terms_note = "Tutti i generatori dichiarati sono apache-2.0 (licenze lette dall'API dei modelli)."
+filters = ["label binarie da derivare dai punteggi: soglia da fissare nel convertitore", "deduplica contro tutti i benchmark del manifest"]
+title = "Gretel Synthetic Safety Alignment Dataset"
+authors = "Gretel"
+url = "https://huggingface.co/datasets/gretelai/gretel-safety-alignment-en-v1"
+changes = "nessun convertitore ancora"
+risks = ["interamente sintetico", "label da giudice LLM, non umane"]
+
+[[dataset]]
+name = "civil-comments"
+id = "google/civil_comments"
+role = "train"
+revision = "f2970eb3a55777454c94069077cc8d9b5866312d"
+read_on = "2026-10-15"
+config = "default"
+splits = ["train"]
+languages = ["en"]
+surfaces = ["prompt"]
+license = "cc0-1.0"
+license_source = "API cardData.license e README («released under CC0 1.0»)"
+gated = false
+texts_by = "commenti pubblici della piattaforma Civil Comments (umani)"
+labels_by = "punteggi di tossicità per attributo aggiunti da Jigsaw; processo di annotazione non descritto nel README"
+generators = ["nessun modello dichiarato"]
+generator_terms = "SÌ"
+generator_terms_note = "Testi umani; label da annotazione, nessun modello dichiarato."
+filters = ["soglia di tossicità da fissare nel convertitore", "deduplica contro tutti i benchmark del manifest"]
+title = "Civil Comments"
+authors = "Borkan, D., Dixon, L., Sorensen, J., Thain, N., Vasserman, L., «Nuanced Metrics for Measuring Unintended Bias with Real Data for Text Classification»"
+url = "https://huggingface.co/datasets/google/civil_comments"
+changes = "nessun convertitore ancora"
+risks = ["tossicità, non policy LLM", "possibili dati personali nei commenti"]
+
+[[dataset]]
+name = "nemotron-content-safety-reasoning"
+id = "nvidia/Nemotron-Content-Safety-Reasoning-Dataset"
+role = "train"
+revision = "792b0715f519c0750d63b73af2bf33ddd9ac3887"
+read_on = "2026-10-15"
+config = "default"
+splits = ["nemotron_content_safety_reasoning"]
+languages = ["en"]
+surfaces = ["prompt", "response"]
+license = "cc-by-4.0"
+license_source = "API cardData.license e README (License/Terms of Use)"
+gated = false
+texts_by = "righe di Aegis 2.0 (stessi id e colonne) con tracce di ragionamento"
+labels_by = "label di Aegis 2.0 (human, llm_jury); tracce filtrate sull'accordo con la label"
+generators = [
+  "deepseek-ai/DeepSeek-R1-0528 (mit): tracce",
+  "Qwen/Qwen3-32B (apache-2.0): tracce",
+  "openai/gpt-oss-120b (apache-2.0): tracce",
+  "generatori e giuria di Aegis 2.0: vedi aegis2-train",
+]
+generator_terms = "SÌ"
+generator_terms_note = "Tracce da modelli mit/apache-2.0; con gli stessi filtri di aegis2-train (righe refusal_data_augmentation fuori, llm_jury marcate) restano i termini di aegis2-train. Lo split topic_control_reasoning (CantTalkAboutThis) resta fuori da questa voce."
+filters = [
+  "solo split nemotron_content_safety_reasoning",
+  "righe refusal_data_augmentation escluse; label llm_jury marcate needs_relabel",
+  "deduplica contro tutti i benchmark del manifest",
+]
+title = "Nemotron Content Safety Reasoning Dataset"
+authors = "NVIDIA; Sreedhar, M. N., Rebedea, T., Parisien, C., «Safety Through Reasoning: An Empirical Study of Reasoning Guardrail Models»"
+url = "https://huggingface.co/datasets/nvidia/Nemotron-Content-Safety-Reasoning-Dataset"
+changes = "nessun convertitore ancora"
+risks = ["duplica le righe di Aegis 2.0: deduplicare tra fonti", "tracce allineate a label llm_jury non ancora rietichettate"]
+
+# --- Training: prompt injection e jailbreak ---------------------------------
+
+[[dataset]]
+name = "deepset-prompt-injections"
+id = "deepset/prompt-injections"
+role = "train"
+revision = "4f61ecb038e9c3fb77e21034b22511b523772cdd"
+read_on = "2026-10-15"
+config = "default"
+splits = ["train"]
+languages = ["en"]
+surfaces = ["injection_direct"]
+license = "apache-2.0"
+license_source = "API cardData.license; il README dichiara anche license: cc-by-4.0 dentro dataset_info"
+gated = false
+texts_by = "NON VERIFICATO (README senza descrizione)"
+labels_by = "label 0/1, autore NON VERIFICATO"
+generators = ["NON VERIFICATO"]
+generator_terms = "INCERTO"
+generator_terms_note = "Provenienza di testi e label non dichiarata."
+filters = ["deduplica contro tutti i benchmark del manifest"]
+title = "prompt-injections"
+authors = "deepset"
+url = "https://huggingface.co/datasets/deepset/prompt-injections"
+changes = "nessun convertitore ancora"
+risks = ["provenienza ignota", "lingua non dichiarata nei metadati"]
+
+[[dataset]]
+name = "llmail-inject"
+id = "microsoft/llmail-inject-challenge"
+role = "train"
+revision = "1063bdf01ec8762b812d5e06ee768a06faa5a6f7"
+read_on = "2026-10-15"
+config = "default"
+splits = ["Phase1", "Phase2"]
+languages = ["en"]
+surfaces = ["injection_indirect"]
+license = "mit"
+license_source = "API cardData.license e README"
+gated = false
+texts_by = "partecipanti umani alla challenge LLMail-Inject (subject e body delle email)"
+labels_by = "esiti della challenge (objectives: defense.undetected, exfil.sent), prodotti dal sistema con vittime GPT-4o mini e Phi-3"
+generators = ["nessun generatore di testo: GPT-4o mini e microsoft/Phi-3-medium-128k-instruct sono le vittime; output non usati"]
+generator_terms = "SÌ"
+generator_terms_note = "Si usano solo subject e body scritti dai partecipanti; la colonna output non entra."
+filters = ["solo subject e body; colonna output esclusa", "tutte le righe sono tentativi di injection: servono negativi da altre fonti", "deduplica contro tutti i benchmark del manifest"]
+title = "LLMail-Inject: Adaptive Prompt Injection Challenge"
+authors = "Abdelnabi, S., Fay, A., Salem, A., Zverev, E., et al., «LLMail-Inject: A Dataset from a Realistic Adaptive Prompt Injection Challenge»"
+url = "https://huggingface.co/datasets/microsoft/llmail-inject-challenge"
+changes = "nessun convertitore ancora"
+risks = ["solo positivi", "molti tentativi ripetuti dalla stessa squadra"]
+
+[[dataset]]
+name = "mosscap-prompt-injection"
+id = "Lakera/mosscap_prompt_injection"
+role = "train"
+revision = "b7e495ff63373ff7f7dabc1e9390cf62b5838570"
+read_on = "2026-10-15"
+config = "default"
+splits = ["train"]
+languages = ["en"]
+surfaces = ["injection_direct"]
+license = "mit"
+license_source = "API cardData.license e README («distributed under the MIT License»)"
+gated = false
+texts_by = "giocatori umani di Mosscap (DEF CON 31), colonna prompt"
+labels_by = "nessuna label: il README avverte che molti prompt non sono injection"
+generators = ["ChatGPT: colonne answer e raw_answer, escluse"]
+generator_terms = "SÌ"
+generator_terms_note = "Entra solo la colonna prompt, scritta dai giocatori; le risposte ChatGPT restano fuori."
+filters = ["solo colonna prompt; answer e raw_answer escluse", "label da costruire con la giuria di teacher", "deduplica contro tutti i benchmark del manifest"]
+title = "mosscap_prompt_injection"
+authors = "Lakera; Pfister, N., Volhejn, V., Knott, M., Arias, S., et al., «Gandalf the Red: Adaptive Security for LLMs», arXiv:2501.07927"
+url = "https://huggingface.co/datasets/Lakera/mosscap_prompt_injection"
+changes = "nessun convertitore ancora"
+risks = ["label assenti", "possibili dati personali nei prompt"]
+
+[[dataset]]
+name = "gandalf-ignore-instructions"
+id = "Lakera/gandalf_ignore_instructions"
+role = "train"
+revision = "04737b65e90a6794ec227012e4a255a7def6344b"
+read_on = "2026-10-15"
+config = "default"
+splits = ["train"]
+languages = ["en"]
+surfaces = ["injection_direct"]
+license = "mit"
+license_source = "API cardData.license e README («distributed under the MIT License»)"
+gated = false
+texts_by = "giocatori umani di Gandalf (luglio 2023)"
+labels_by = "selezione per similarità (>= 0,825) con embeddings OpenAI text-embedding-ada-002; PII filtrate con Lakera Guard"
+generators = ["OpenAI text-embedding-ada-002: selezione delle righe (termini OpenAI)"]
+generator_terms = "INCERTO"
+generator_terms_note = "La selezione dipende da output di un modello OpenAI, i cui termini vietano l'uso degli output per sviluppare modelli concorrenti; applicabilità a una selezione NON VERIFICATA."
+filters = ["deduplica contro tutti i benchmark del manifest"]
+title = "gandalf_ignore_instructions"
+authors = "Lakera; Pfister, N., Volhejn, V., Knott, M., Arias, S., et al., «Gandalf the Red: Adaptive Security for LLMs», arXiv:2501.07927"
+url = "https://huggingface.co/datasets/Lakera/gandalf_ignore_instructions"
+changes = "nessun convertitore ancora"
+risks = ["solo positivi", "rumore dichiarato dalla selezione automatica"]
+
+[[dataset]]
+name = "in-the-wild-jailbreak"
+id = "TrustAIRLab/in-the-wild-jailbreak-prompts"
+role = "train"
+revision = "a10aab8eff1c73165a442d4464dce192bd28b9c5"
+read_on = "2026-10-15"
+config = "jailbreak_2023_12_25"
+splits = ["train"]
+languages = ["en"]
+surfaces = ["injection_direct"]
+license = "mit"
+license_source = "API cardData.license e README («jailbreak_llms is licensed under the terms of the MIT license»)"
+gated = false
+texts_by = "prompt raccolti da Reddit, Discord, siti (FlowGPT, ...) e dataset open-source, dic 2022 - dic 2023"
+labels_by = "colonna jailbreak assegnata dagli autori dello studio"
+generators = ["nessun modello dichiarato"]
+generator_terms = "SÌ"
+generator_terms_note = "Testi raccolti da utenti umani; nessun generatore dichiarato."
+filters = ["deduplica contro tutti i benchmark del manifest"]
+title = "In-The-Wild Jailbreak Prompts (jailbreak_2023_12_25)"
+authors = "Shen, X., Chen, Z., Backes, M., Shen, Y., Zhang, Y., «\"Do Anything Now\": Characterizing and Evaluating In-The-Wild Jailbreak Prompts on Large Language Models»"
+url = "https://huggingface.co/datasets/TrustAIRLab/in-the-wild-jailbreak-prompts"
+changes = "nessun convertitore ancora"
+risks = ["contenuti di utenti, possibili dati personali", "sovrapposto a jackhhao/jailbreak-classification (stessa fonte verazuo/jailbreak_llms)"]
+
+[[dataset]]
+name = "in-the-wild-regular"
+id = "TrustAIRLab/in-the-wild-jailbreak-prompts"
+role = "train"
+revision = "a10aab8eff1c73165a442d4464dce192bd28b9c5"
+read_on = "2026-10-15"
+config = "regular_2023_12_25"
+splits = ["train"]
+languages = ["en"]
+surfaces = ["injection_direct"]
+license = "mit"
+license_source = "API cardData.license e README («jailbreak_llms is licensed under the terms of the MIT license»)"
+gated = false
+texts_by = "prompt regolari raccolti dalle stesse piattaforme, dic 2022 - dic 2023"
+labels_by = "colonna jailbreak assegnata dagli autori dello studio"
+generators = ["nessun modello dichiarato"]
+generator_terms = "SÌ"
+generator_terms_note = "Testi raccolti da utenti umani; nessun generatore dichiarato."
+filters = ["negativi per injection_direct", "deduplica contro tutti i benchmark del manifest"]
+title = "In-The-Wild Jailbreak Prompts (regular_2023_12_25)"
+authors = "Shen, X., Chen, Z., Backes, M., Shen, Y., Zhang, Y., «\"Do Anything Now\": Characterizing and Evaluating In-The-Wild Jailbreak Prompts on Large Language Models»"
+url = "https://huggingface.co/datasets/TrustAIRLab/in-the-wild-jailbreak-prompts"
+changes = "nessun convertitore ancora"
+risks = ["contenuti di utenti, possibili dati personali"]
+
+[[dataset]]
+name = "yanismiraoui-prompt-injections"
+id = "yanismiraoui/prompt_injections"
+role = "train"
+revision = "bd55359f2f332afc35f277ac3dd08f7111b024c9"
+read_on = "2026-10-15"
+config = "default"
+splits = ["train"]
+languages = ["it", "en"]
+surfaces = ["injection_direct"]
+license = "apache-2.0"
+license_source = "API cardData.license, README e file NOTICE (Apache 2.0, contenuti del dataset inclusi)"
+gated = false
+texts_by = "NON VERIFICATO (source_datasets: original; autore e traduttore non dichiarati)"
+labels_by = "nessuna label: una sola colonna di injection"
+generators = ["NON VERIFICATO"]
+generator_terms = "INCERTO"
+generator_terms_note = "Il README non dice chi ha scritto o tradotto i prompt in sette lingue."
+filters = ["solo righe it/en", "deduplica contro tutti i benchmark del manifest"]
+title = "Prompt Injections"
+authors = "Yanis Miraoui"
+url = "https://huggingface.co/datasets/yanismiraoui/prompt_injections"
+changes = "nessun convertitore ancora"
+risks = ["solo positivi", "lingua non annotata per riga"]
+
+[[dataset]]
+name = "jackhhao-jailbreak"
+id = "jackhhao/jailbreak-classification"
+role = "train"
+revision = "2f2ceeb39658696fd3f462403562b6eea5306287"
+read_on = "2026-10-15"
+config = "default"
+splits = ["train"]
+languages = ["en"]
+surfaces = ["injection_direct"]
+license = "apache-2.0"
+license_source = "API cardData.license e README"
+gated = false
+texts_by = "jailbreak da verazuo/jailbreak_llms (mit); benigni da OpenOrca e GPTeacher"
+labels_by = "colonna type (jailbreak/benign) per fonte"
+generators = ["benigni GPTeacher e OpenOrca: generati con modelli OpenAI, esclusi dal filtro"]
+generator_terms = "SÌ"
+generator_terms_note = "Entrano solo le righe type = jailbreak, raccolte da utenti umani; i benigni generati con modelli OpenAI restano fuori."
+filters = ["solo righe type = jailbreak", "deduplica contro tutti i benchmark del manifest"]
+title = "Jailbreak Classification"
+authors = "jackhhao"
+url = "https://huggingface.co/datasets/jackhhao/jailbreak-classification"
+changes = "nessun convertitore ancora"
+risks = ["sovrapposto a in-the-wild-jailbreak (stessa fonte)"]
+
+[[dataset]]
+name = "nemotron-rl-indirect-injection"
+id = "nvidia/Nemotron-RL-Agentic-Indirect-Prompt-Injection-v1"
+role = "train"
+revision = "d738d4f361cc38bb4d7a42b9066776dade5332f5"
+read_on = "2026-10-15"
+config = "default"
+splits = ["train"]
+languages = ["en"]
+surfaces = ["injection_indirect"]
+license = "cc-by-4.0"
+license_source = "API cardData.license e README (License/Terms of Use)"
+gated = false
+texts_by = "interamente sintetico: task, ambienti e injection generati da LLM"
+labels_by = "verifier deterministico dell'ambiente RL"
+generators = [
+  "nvidia/NVIDIA-Nemotron-3-Super-120B-A12B-BF16 (nvidia-nemotron-open-model-license): generatore e attaccante",
+  "nvidia/NVIDIA-Nemotron-3-Nano-30B-A3B-BF16: difensore",
+]
+generator_terms = "INCERTO"
+generator_terms_note = "I termini della NVIDIA Nemotron Open Model License sugli output usati per addestrare altri modelli non sono stati letti."
+filters = ["formato RL: estrarre il campo che contiene l'injection", "deduplica contro tutti i benchmark del manifest"]
+title = "Nemotron-RL-Agentic-Indirect-Prompt-Injection-v1"
+authors = "NVIDIA Corporation"
+url = "https://huggingface.co/datasets/nvidia/Nemotron-RL-Agentic-Indirect-Prompt-Injection-v1"
+changes = "nessun convertitore ancora"
+risks = ["testi adversarial sintetici", "contesto agentico oltre la v1: si usa solo il testo iniettato"]
+
+# --- Benchmark held-out (solo valutazione) ----------------------------------
+
+[[dataset]]
+name = "aegis2-test"
+id = "nvidia/Aegis-AI-Content-Safety-Dataset-2.0"
+role = "benchmark"
+revision = "d86bb8bedff51d25ac834ab7838f1cc61acb7a2c"
+read_on = "2026-10-15"
+config = "default"
+splits = ["test"]
+languages = ["en"]
+surfaces = ["prompt", "response"]
+license = "cc-by-4.0"
+license_source = "API cardData.license e README"
+gated = false
+texts_by = "come aegis2-train; il test non contiene rifiuti sintetici (README)"
+labels_by = "prompt umani; risposte human o llm_jury"
+generators = ["come aegis2-train"]
+generator_terms = "INCERTO"
+generator_terms_note = "Label llm_jury con Gemma-2-27B in giuria; irrilevante per la sola valutazione."
+filters = ["prompt REDACTED esclusi dalla valutazione"]
+title = "Nemotron Content Safety Dataset V2 (Aegis 2.0), split test"
+authors = "NVIDIA; Ghosh, S., et al., NAACL 2025"
+url = "https://huggingface.co/datasets/nvidia/Aegis-AI-Content-Safety-Dataset-2.0"
+changes = "solo valutazione"
+risks = ["stesse righe (id) del test di Nemotron v3"]
+text_fields = ["prompt", "response"]
+
+[[dataset]]
+name = "nemotron3-test"
+id = "nvidia/Nemotron-Safety-Guard-Dataset-v3"
+role = "benchmark"
+revision = "a3f7ecb3433d1933701a83f18de16c36934a7f51"
+read_on = "2026-10-15"
+config = "default"
+splits = ["test"]
+languages = ["it", "en"]
+surfaces = ["prompt", "response"]
+license = "cc-by-4.0"
+license_source = "API cardData.license e README"
+gated = false
+texts_by = "come nemotron3-train"
+labels_by = "come nemotron3-train"
+generators = ["come nemotron3-train"]
+generator_terms = "INCERTO"
+generator_terms_note = "Vedi nemotron3-train; irrilevante per la sola valutazione."
+filters = ["tutte le lingue indicizzate per la deduplica; valutazione su it/en"]
+title = "Nemotron-Safety-Guard-Dataset-v3, split test"
+authors = "NVIDIA; Joshi, R., et al., arXiv:2508.01710"
+url = "https://huggingface.co/datasets/nvidia/Nemotron-Safety-Guard-Dataset-v3"
+changes = "solo valutazione"
+risks = ["traduzione delle righe del test di Aegis 2.0"]
+text_fields = ["prompt", "response"]
+
+[[dataset]]
+name = "xstest"
+id = "Paul/XSTest"
+role = "benchmark"
+revision = "f600c994b256f12867dfa5b3eb3d545a3e62f8b5"
+read_on = "2026-10-15"
+config = "default"
+splits = ["train"]
+languages = ["en"]
+surfaces = ["over_refusal"]
+license = "cc-by-4.0"
+license_source = "API cardData.license e README"
+gated = false
+texts_by = "autori del paper, con l'aiuto di dizionari online e GPT-4 per omonimi e linguaggio figurato (README)"
+labels_by = "autori (label safe/unsafe)"
+generators = ["GPT-4: assistenza per alcuni esempi"]
+generator_terms = "INCERTO"
+generator_terms_note = "Esempi in parte assistiti da GPT-4; irrilevante per la sola valutazione."
+filters = ["unico split pubblicato (train), usato come test"]
+title = "XSTest"
+authors = "Röttger, P., Kirk, H., Vidgen, B., Attanasio, G., Bianchi, F., Hovy, D., «XSTest: A Test Suite for Identifying Exaggerated Safety Behaviours in Large Language Models», NAACL 2024"
+url = "https://huggingface.co/datasets/Paul/XSTest"
+changes = "solo valutazione"
+risks = ["450 prompt: stime imprecise"]
+text_fields = ["prompt"]
+
+[[dataset]]
+name = "xstest-it"
+id = "saiteki-kai/XSTest-IT"
+role = "benchmark"
+revision = "849cea57e1978a52907d5f2efd3e5ab0edddbe5e"
+read_on = "2026-10-15"
+config = "default"
+splits = ["test"]
+languages = ["it", "en"]
+surfaces = ["over_refusal"]
+license = "cc-by-4.0"
+license_source = "API cardData.license e README"
+gated = false
+texts_by = "XSTest con traduzioni in italiano e varietà regionali; traduttore NON VERIFICATO (README solo metadati)"
+labels_by = "label di XSTest"
+generators = ["traduttore NON VERIFICATO"]
+generator_terms = "INCERTO"
+generator_terms_note = "Traduttore non dichiarato; irrilevante per la sola valutazione."
+filters = ["colonna lang: English, Italian e varietà regionali"]
+title = "XSTest-IT"
+authors = "saiteki-kai (Hugging Face); autori NON VERIFICATI"
+url = "https://huggingface.co/datasets/saiteki-kai/XSTest-IT"
+changes = "solo valutazione"
+risks = ["contiene anche le righe inglesi di XSTest"]
+text_fields = ["prompt"]
+
+[[dataset]]
+name = "wildguardtest"
+id = "allenai/wildguardmix"
+role = "benchmark"
+revision = "d29c47f41c8b51348b5c8e8c81c039b3132b66d1"
+read_on = "2026-10-15"
+config = "wildguardtest"
+splits = ["test"]
+languages = ["en"]
+surfaces = ["prompt", "response"]
+license = "odc-by"
+license_source = "API cardData.license; README e AI2 Responsible Use Guidelines non leggibili senza accesso (README 403, first-rows 401)"
+gated = true
+texts_by = "NON VERIFICATO (gated)"
+labels_by = "NON VERIFICATO (gated)"
+generators = ["NON VERIFICATO (gated)"]
+generator_terms = "INCERTO"
+generator_terms_note = "Schema e generatori non leggibili senza accettare il gating AI2."
+filters = ["file test/wildguard_test.parquet (config pubblica nei metadati API)"]
+title = "WildGuardTest (allenai/wildguardmix)"
+authors = "Allen Institute for AI; autori NON VERIFICATI (README non leggibile)"
+url = "https://huggingface.co/datasets/allenai/wildguardmix"
+changes = "solo valutazione"
+risks = ["gated: serve accettare le AI2 Responsible Use Guidelines con l'account del perimetro"]
+# text_fields assente: schema NON VERIFICATO, il cancello blocca la build.
+
+[[dataset]]
+name = "toxicchat-test"
+id = "lmsys/toxic-chat"
+role = "benchmark"
+revision = "29df8e4dba60e1f4af4b4075c0705c5b313548a8"
+read_on = "2026-10-15"
+config = "toxicchat0124"
+splits = ["test"]
+languages = ["en"]
+surfaces = ["prompt", "injection_direct"]
+license = "cc-by-nc-4.0"
+license_source = "API cardData.license e README («Both the user prompts and the model outputs are licensed under CC-BY-NC-4.0»)"
+gated = false
+texts_by = "prompt di utenti della demo Vicuna; model_output di Vicuna"
+labels_by = "annotazione collaborativa umano-AI (toxicity, jailbreaking); human_annotation per riga"
+generators = ["Vicuna: model_output"]
+generator_terms = "INCERTO"
+generator_terms_note = "Solo valutazione interna: licenza NC, mai nel training."
+filters = ["solo valutazione interna (NC)"]
+title = "ToxicChat (toxicchat0124), split test"
+authors = "Lin, Z., Wang, Z., Tong, Y., Wang, Y., Guo, Y., Wang, Y., Shang, J., «ToxicChat: Unveiling Hidden Challenges of Toxicity Detection in Real-World User-AI Conversation»"
+url = "https://huggingface.co/datasets/lmsys/toxic-chat"
+changes = "solo valutazione"
+risks = ["NC: nessuna redistribuzione né training", "model_output vale «EMPTY» in alcune righe"]
+text_fields = ["user_input", "model_output"]
+
+[[dataset]]
+name = "jbb-behaviors"
+id = "JailbreakBench/JBB-Behaviors"
+role = "benchmark"
+revision = "886acc352a31533ffbcf4ef22c744658688086fc"
+read_on = "2026-10-15"
+config = "behaviors"
+splits = ["harmful", "benign"]
+languages = ["en"]
+surfaces = ["prompt", "over_refusal"]
+license = "mit"
+license_source = "API cardData.license e README («released under MIT License»)"
+gated = false
+texts_by = "comportamenti da AdvBench, TDC/HarmBench e originali (colonna Source)"
+labels_by = "split harmful/benign degli autori"
+generators = ["nessun modello dichiarato nel README"]
+generator_terms = "SÌ"
+generator_terms_note = "Solo valutazione."
+filters = ["deduplica sulla colonna Goal; Target è un template «Sure, here is ...»"]
+title = "JBB-Behaviors"
+authors = "Chao, P., Debenedetti, E., Robey, A., Andriushchenko, M., Croce, F., Sehwag, V., Dobriban, E., Flammarion, N., Pappas, G. J., Tramèr, F., Hassani, H., Wong, E., «JailbreakBench», NeurIPS Datasets and Benchmarks 2024"
+url = "https://huggingface.co/datasets/JailbreakBench/JBB-Behaviors"
+changes = "solo valutazione"
+risks = ["100 + 100 righe"]
+text_fields = ["Goal"]
+
+[[dataset]]
+name = "orbench-hard"
+id = "bench-llm/or-bench"
+role = "benchmark"
+revision = "e36d8b80e81837c8a8f264bbb2a49f1b32c7e272"
+read_on = "2026-10-15"
+config = "or-bench-hard-1k"
+splits = ["train"]
+languages = ["en"]
+surfaces = ["over_refusal"]
+license = "cc-by-4.0"
+license_source = "API cardData.license e README"
+gated = false
+texts_by = "prompt riscritti da LLM (README senza dettagli; generatori dichiarati nel paper, NON VERIFICATI qui)"
+labels_by = "moderazione con LLM (paper, NON VERIFICATO qui)"
+generators = ["NON VERIFICATO nel README"]
+generator_terms = "INCERTO"
+generator_terms_note = "Generatori non letti; irrilevante per la sola valutazione."
+filters = ["unico split pubblicato (train), usato come test"]
+title = "OR-Bench (or-bench-hard-1k)"
+authors = "Cui, J., Chiang, W.-L., Stoica, I., Hsieh, C.-J., «OR-Bench: An Over-Refusal Benchmark for Large Language Models», arXiv:2405.20947"
+url = "https://huggingface.co/datasets/bench-llm/or-bench"
+changes = "solo valutazione"
+risks = ["hard-1k e toxic vanno tenuti fuori anche da or-bench-80k se entrasse nel training"]
+text_fields = ["prompt"]

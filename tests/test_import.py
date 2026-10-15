@@ -1,12 +1,15 @@
 import subprocess
 import sys
 
-HEAVY_MODULES = ("torch", "unsloth", "transformers")
+import pytest
+
+HEAVY_MODULES = ("torch", "unsloth", "transformers", "datasets", "huggingface_hub")
 
 
-def test_import_does_not_load_training_stack():
+@pytest.mark.parametrize("module", ["scudo", "scudo.ingest"])
+def test_import_does_not_load_training_stack(module):
     probe = (
-        "import sys, scudo\n"
+        f"import sys, {module}\n"
         f"loaded = [name for name in {HEAVY_MODULES!r} if name in sys.modules]\n"
         "print(','.join(loaded))\n"
     )

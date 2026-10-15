@@ -62,6 +62,25 @@ def test_languages_outside_it_en_are_dropped(language):
     assert cases_from_row(row(language=language)) == []
 
 
+def test_drop_reasons_are_named():
+    from scudo.nemotron import drop_reason
+
+    assert drop_reason(row(language="de")) == "lingua fuori da it/en"
+    assert drop_reason(row(prompt="REDACTED")) == "prompt REDACTED"
+    assert drop_reason(row(response_source="refusal_data_augmentation")) == (
+        "refusal_data_augmentation")
+    assert drop_reason(row()) is None
+
+
+def test_llm_jury_labels_are_marked_for_relabel():
+    from scudo.aegis import needs_relabel
+
+    source = row(response="Ecco come.", response_label="unsafe", response_source="llm_jury")
+    request, response = cases_from_row(source)
+    assert not needs_relabel(source, request)
+    assert needs_relabel(source, response)
+
+
 def test_unknown_label_is_an_error_not_a_no_violation():
     with pytest.raises(ValueError):
         cases_from_row(row(prompt_label="maybe"))

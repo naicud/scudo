@@ -37,8 +37,9 @@ senza data card completa non entra nel manifest.
 - Uso commerciale e pesi derivati ammessi: SÌ, secondo il produttore. La voce sui
   generatori e sui teacher resta INCERTO (vedi sotto).
 - Licenze delle fonti a monte, se il dataset ne aggrega altri:
-  - Aegis 2.0 (`nvidia/Aegis-AI-Content-Safety-Dataset-2.0`): CC-BY-4.0 secondo la nota di
-    ricerca `docs/research/guardrail-datasets-2026-10-15.md`; non riletto oggi.
+  - Aegis 2.0 (`nvidia/Aegis-AI-Content-Safety-Dataset-2.0`): CC-BY-4.0, riletto il
+    2026-10-15 da API e README alla revisione `d86bb8bedff51d25ac834ab7838f1cc61acb7a2c`
+    (voce `aegis2-train` di `src/scudo/manifest.toml`).
   - Sottoinsieme `refusal_data_augmentation` (rifiuti generati con Gemma-2-27B in Aegis
     2.0): soggetto ai termini Gemma. Escluso dal tracer.
   - Pipeline CultureGuard: licenze dei modelli e del traduttore non verificate (vedi
@@ -88,7 +89,8 @@ uso o training.
   giudice di rispondere INSUFFICIENT quando manca contesto essenziale, ma il dataset non
   ha una label corrispondente.
 - Criteri semantici associati: `HARMFUL_REQUEST` (input) e `HARMFUL_RESPONSE` (output) in
-  `src/scudo/nemotron.py`, in inglese. Chiedono se il messaggio dell'utente, o la risposta
+  `src/scudo/aegis.py` (lo schema di Aegis 2.0, riesportati da `src/scudo/nemotron.py`), in
+  inglese. Chiedono se il messaggio dell'utente, o la risposta
   dell'assistente, richiedono, promuovono o contengono contenuti vietati da una policy di
   content safety. Le categorie elencate sono violenza, minacce, armi, pianificazione
   criminale, frode, malware, sostanze controllate, autolesionismo o suicidio, contenuti
@@ -124,17 +126,19 @@ uso o training.
 
 ## Deduplicazione contro i benchmark
 
-- Benchmark controllati (es. XSTest, XSTest-IT, WildGuardTest, HarmBench, ToxicChat, gold
-  set): nessuno ancora. Deduplica contro XSTest, XSTest-IT, WildGuardTest, HarmBench,
-  ToxicChat e gold set: NON ancora fatta, pendente (issue #3). Da controllare anche la
-  sovrapposizione con Aegis 2.0 e Aegis 1.0 (stesso schema di categorie; il test di Aegis
-  2.0 va tenuto held-out).
-- Metodo: hash esatto / near-duplicate (soglia): solo controllo interno al tracer, per id
-  e testo esatto (prompt o risposta) tra test held-out e campione di training. Nessun
-  near-duplicate. Il controllo è contro i 2.000 casi del campione di training passati a
-  `heldout_cases`, non contro l'intero split train (451.424 righe).
-- Righe rimosse: nessuna rimozione contro benchmark esterni, perché il controllo non è
-  ancora stato fatto. Righe del test scartate dal controllo interno: non registrate.
+- Benchmark controllati: tutte le voci `benchmark` di `src/scudo/manifest.toml` (test di
+  Aegis 2.0 e di Nemotron v3, XSTest, XSTest-IT, WildGuardTest, ToxicChat test, JBB-Behaviors,
+  OR-Bench-hard-1k), con `python -m scudo.ingest build` (issue #3). Oggi la build è bloccata
+  dal cancello: la voce `nemotron3-train` ha termini dei generatori INCERTO senza decisione
+  umana e WildGuardTest (gated) non ha campi di testo verificati. Il tracer #2 non è
+  ancora deduplicato contro i benchmark esterni.
+- Metodo: nella build, SHA-256 del testo normalizzato e near-duplicate MinHash (shingle di 5
+  caratteri, 128 bin, LSH 25×5, Jaccard stimata >= 0,8), vedi `docs/datasets.md`. Nel
+  tracer #2 resta solo il controllo interno per id e testo esatto tra test held-out e i
+  2.000 casi del campione di training passati a `heldout_cases`.
+- Righe rimosse: nessun conteggio finché la build non passa il cancello. Le righe del test
+  di Nemotron v3 hanno gli stessi id di quelle del test di Aegis 2.0 (letto da
+  datasets-server): sono traduzioni delle stesse righe.
 
 ## Attribuzioni
 
@@ -186,5 +190,6 @@ formato richiesto dalla licenza. Le stesse attribuzioni vanno nella model card.
 - Criterio in inglese su testi in italiano: il giudizio dipende dalla lingua del criterio.
   Va tenuto presente nella lettura dei risultati.
 - Held-out piccolo: 200 casi per lingua non bastano per stime precise.
-- Deduplicazione incompleta: il controllo contro i benchmark non è ancora fatto (issue #3),
-  quindi resta il rischio di contaminazione.
+- Deduplicazione incompleta: il meccanismo esiste (issue #3) ma la build è bloccata dal
+  cancello finché i termini dei generatori restano INCERTO, quindi il rischio di
+  contaminazione resta.
