@@ -1,14 +1,11 @@
 """Genera il notebook Colab dell'eval (issue #4): il nostro Fast e le baseline sui benchmark.
 
-Come `scudo.notebook` per il tracer: le celle vivono qui come stringhe e
-`python -m scudo.eval_notebook` riscrive `notebooks/eval.ipynb`. Solo standard
+Come `scudo.notebook` per il tracer: le celle vivono qui come stringhe (il setup
+in `scudo.notebook_cells`) e `python -m scudo.eval_notebook` riscrive `notebooks/eval.ipynb`. Solo standard
 library; le dipendenze pesanti si importano dentro le celle, su Colab.
 """
 
-import json
-from pathlib import Path
-
-from scudo.notebook import _cell
+from scudo.notebook_cells import SETUP_HUB_CACHE, notebook, write
 
 NOTEBOOK_PATH = "notebooks/eval.ipynb"
 FAST_BASE_REVISION = "851bf6e806efd8d0a36b00ddf55e13ccb7b8cd0a"  # Qwen/Qwen3.5-4B, come il tracer
@@ -33,49 +30,6 @@ Prerequisiti: runtime Colab A100; Colab Secrets `HF_TOKEN` (lettura e scrittura 
 `Naicud/scudo-checkpoints`) e `GH_TOKEN` (lettura di `naicud/scudo`). Dopo una
 disconnessione si rieseguono setup, config, dati e helper, poi le celle dei modelli
 mancanti: ogni modello carica i suoi report appena finisce."""
-
-SETUP = """\
-!nvidia-smi
-
-import json
-import os
-import shutil
-import subprocess
-import sys
-
-from google.colab import userdata
-
-os.environ["HF_TOKEN"] = userdata.get("HF_TOKEN")  # mai stampato
-GH_TOKEN = userdata.get("GH_TOKEN")
-CACHE_DIR = "/content/hf-cache"
-os.environ["HF_HUB_CACHE"] = f"{CACHE_DIR}/hub"  # prima di qualsiasi import di huggingface_hub
-
-SCUDO_REF = "main"
-REPO_DIR = "/content/scudo"
-RUN_LOG = {}
-
-if os.path.isdir(REPO_DIR):
-    shutil.rmtree(REPO_DIR)
-try:
-    # Output catturato: l'URL con il token non deve finire nei log.
-    subprocess.run(
-        ["git", "clone", "--quiet",
-         f"https://x-access-token:{GH_TOKEN}@github.com/naicud/scudo.git", REPO_DIR],
-        check=True, capture_output=True, env={**os.environ, "GIT_TERMINAL_PROMPT": "0"},
-    )
-except subprocess.CalledProcessError:
-    raise RuntimeError("clone di naicud/scudo fallito: controlla il secret GH_TOKEN") from None
-subprocess.run(["git", "-C", REPO_DIR, "remote", "set-url", "origin",
-                "https://github.com/naicud/scudo.git"], check=True)
-subprocess.run(["git", "-C", REPO_DIR, "checkout", "--quiet", SCUDO_REF], check=True)
-RUN_LOG["scudo_ref"] = SCUDO_REF
-RUN_LOG["scudo_sha"] = subprocess.run(
-    ["git", "-C", REPO_DIR, "rev-parse", "HEAD"], check=True, capture_output=True, text=True
-).stdout.strip()
-print("scudo", RUN_LOG["scudo_sha"])
-
-!pip install -q -e "/content/scudo[train]"
-sys.path.insert(0, f"{REPO_DIR}/src")  # l'editable install non e' visibile al kernel gia' avviato"""
 
 CONFIG = """\
 from pathlib import Path
@@ -281,7 +235,7 @@ separato con il loro runtime."""
 
 CELLS = (
     ("markdown", "intro", INTRO),
-    ("code", "setup", SETUP),
+    ("code", "setup", SETUP_HUB_CACHE),
     ("code", "config", CONFIG.replace("@FAST_BASE_REVISION@", FAST_BASE_REVISION)),
     ("code", "dedup", DEDUP),
     ("code", "data", DATA),
@@ -298,24 +252,11 @@ CELLS = (
 
 
 def build() -> dict:
-    return {
-        "cells": [_cell(*cell) for cell in CELLS],
-        "metadata": {
-            "accelerator": "GPU",
-            "colab": {"gpuType": "A100", "provenance": []},
-            "kernelspec": {"display_name": "Python 3", "language": "python", "name": "python3"},
-            "language_info": {"name": "python"},
-        },
-        "nbformat": 4,
-        "nbformat_minor": 5,
-    }
+    return notebook(CELLS)
 
 
 def main() -> None:
-    target = Path(__file__).resolve().parents[2] / NOTEBOOK_PATH
-    target.parent.mkdir(parents=True, exist_ok=True)
-    target.write_text(json.dumps(build(), indent=1, ensure_ascii=False) + "\n", encoding="utf-8")
-    print(target)
+    print(write(NOTEBOOK_PATH, build()))
 
 
 if __name__ == "__main__":

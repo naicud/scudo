@@ -2,8 +2,11 @@
 
 Seguono le celle di `scudo.accurate_cells` e ne usano le variabili (RUN, tok,
 BASE_WEIGHTS, DEDUP, ...). L'eval riusa benchmark, runner e report dell'harness
-delle baseline; il solo passo nuovo è `scudo.reasoned_runner`.
+delle baseline; il solo passo nuovo è `scudo.reasoned_runner`. L'adapter
+si salva con la cella condivisa `scudo.notebook_cells.ADAPTER`.
 """
+
+from scudo.notebook_cells import ADAPTER, named
 
 EVAL = """\
 from functools import partial
@@ -18,19 +21,7 @@ from scudo.manifest import benchmarks
 from scudo.reasoned_runner import accurate_reports, accurate_scorer
 from scudo.runner import TransformersBackend, run
 
-FastLanguageModel.for_inference(model)
-api = HfApi()
-
-# Adapter: salvato, hashato e caricato; l'identita' usa lo SHA del commit di upload.
-ADAPTER_DIR = Path("/content/adapter")
-model.save_pretrained(str(ADAPTER_DIR))
-adapter_sha = file_sha256(ADAPTER_DIR / "adapter_model.safetensors")
-commit = api.upload_folder(
-    folder_path=str(ADAPTER_DIR), repo_id=CKPT, path_in_repo="adapter",
-    commit_message="adapter dell'Accurate",
-)
-adapter_identity = ArtifactIdentity(CKPT, commit.oid, "adapter_model.safetensors", adapter_sha)
-RUN_LOG["adapter"] = adapter_identity.manifest_entry()
+""" + named(ADAPTER, "dell'Accurate") + """
 
 # Sequenza del frame nativo: prompt + Reasoning:, generazione greedy entro il budget,
 # token fino allo stop, Answer: e logit di A/B/C. Stop mancante = errore del caso.

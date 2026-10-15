@@ -1,0 +1,159 @@
+import hashlib
+import json
+import subprocess
+from collections import Counter
+from dataclasses import asdict, replace
+from functools import partial
+
+import pytest
+
+from scudo import italian_run, mix_cli, spotcheck_it
+from scudo.budget import BudgetError, Ledger, confirm_volume
+from scudo.mix import MixError, Targets
+from scudo.spotcheck_it import SpotCheckError
+from scudo.mix_pool import GENERATED_ENTRY, PoolError, load_ingest, load_italian
+from test_manifest import TRAIN
+from test_mix import EN_ONLY, judged, pool
+from test_pilot import toml
+from test_spotcheck_it import fill, item
+from test_teacher import CONFIG
+
+DIGEST = "a" * 64
+
+
+def entries_for(cases):
+    names = {}
+    for p in cases:
+        names.setdefault(p.entry, p.case.source)
+    return [replace(TRAIN, name=name, id=source) for name, source in names.items()]
+
+
+def write_ingest(out, cases, digest=DIGEST):
+    out.mkdir(parents=True, exist_ok=True)
+    sources = {}
+    for p in cases:
+        record = {**asdict(p.case), "split": "train", "needs_relabel": p.needs_relabel}
+        with (out / f"{p.entry}.jsonl").open("a", encoding="utf-8") as handle:
+            handle.write(json.dumps(record, ensure_ascii=False) + "\n")
+        sources.setdefault(p.entry, {"kept": 0})["kept"] += 1
+    (out / "report.json").write_text(json.dumps({"manifest_sha256": digest, "sources": sources}))
+    return out
+
+
+def test_ingest_outputs_load_with_their_provenance(tmp_path):
+    cases = pool(4)
+    loaded, info = load_ingest(write_ingest(tmp_path / "in", cases), entries=entries_for(cases),
+                               manifest_sha256=DIGEST)
+    assert sorted(p.key for p in loaded) == sorted(p.key for p in cases)
+    assert info["manifest_sha256"] == DIGEST and set(info["sources"]) == {p.entry for p in cases}
+
+
+def test_ingest_from_another_manifest_or_blocked_source_is_refused(tmp_path):
+    cases = pool(2)
+    out = write_ingest(tmp_path / "in", cases)
+    with pytest.raises(PoolError, match="manifest"):
+        load_ingest(out, entries=entries_for(cases), manifest_sha256="b" * 64)
+    blocked = [replace(e, generator_terms="INCERTO") for e in entries_for(cases)]
+    with pytest.raises(PoolError, match="cancello"):
+        load_ingest(out, entries=blocked, manifest_sha256=DIGEST)
+    with (out / "harm.jsonl").open("a") as handle:
+        handle.write(json.dumps({**asdict(cases[0].case), "source_id": "x",
+                                 "needs_relabel": False}) + "\n")
+    with pytest.raises(PoolError, match="report"):
+        load_ingest(out, entries=entries_for(cases), manifest_sha256=DIGEST)
+
+
+def italian_batch(tmp_path, records, *, accept=True):
+    out = tmp_path / "it-batch"
+    out.mkdir(parents=True)
+    (out / italian_run.POOL).write_text(
+        "".join(json.dumps(r, ensure_ascii=False) + "\n" for r in records), encoding="utf-8")
+    if accept:
+        spotcheck_it.export(out, n=20, seed=0)
+        spotcheck_it.import_review(out, fill(out, tmp_path, 0), by="Giulia")
+    return out
+
+
+def translated(i):
+    return {**item(i), "key": f"tr:harm:{i}:prompt", "origin": "translated", "source": "org/harm",
+            "source_id": f"{i}#it", "provenance": {"kind": "translated", "entry": "harm"}}
+
+
+def test_italian_batch_enters_only_with_an_accepted_spot_check(tmp_path):
+    entries = entries_for(pool(1))
+    records = [item(i) for i in range(25)] + [translated(i) for i in range(5)]
+    with pytest.raises(SpotCheckError):
+        load_italian(italian_batch(tmp_path / "a", records, accept=False), entries=entries)
+    loaded, info = load_italian(italian_batch(tmp_path / "b", records), entries=entries)
+    assert Counter(p.entry for p in loaded) == {GENERATED_ENTRY: 25, "harm": 5}
+    assert info["pool_sha256"] == info["spotcheck_pool_sha256"]
+    assert info["by_origin_language"] == {"generated/it": 25, "translated/it": 5}
+
+
+def test_translated_case_from_a_blocked_or_other_source_is_refused(tmp_path):
+    entries = entries_for(pool(1))
+    records = [item(i) for i in range(25)] + [translated(1)]
+    batch = italian_batch(tmp_path, records)
+    blocked = [replace(e, generator_terms="INCERTO") if e.name == "harm" else e for e in entries]
+    with pytest.raises(PoolError, match="cancello"):
+        load_italian(batch, entries=blocked)
+    wrong = italian_batch(tmp_path / "w", [item(i) for i in range(25)]
+                          + [{**translated(1), "source": "org/inj"}])
+    with pytest.raises(PoolError, match="fonte"):
+        load_italian(wrong, entries=entries)
+
+
+def test_build_writes_mix_and_a_manifest_that_pins_every_input(tmp_path, monkeypatch):
+    cases = pool()
+    ingest = write_ingest(tmp_path / "in", cases)
+    monkeypatch.setattr(mix_cli, "load_ingest", partial(
+        load_ingest, entries=entries_for(cases), manifest_sha256=DIGEST))
+    outcomes = tmp_path / "outcomes.jsonl"
+    index = judged(cases)
+    outcomes.write_text("".join(json.dumps(r) + "\n" for by in index.values() for r in by.values()))
+    targets = Targets(total=100, languages=EN_ONLY, method_cap=0.5)
+    common = dict(targets=targets, seed=1, sha="c" * 40)
+    with pytest.raises(MixError, match="override-reason"):
+        mix_cli.build_mix(ingest, [], [outcomes], tmp_path / "mix", override_reason=None, **common)
+    manifest = mix_cli.build_mix(ingest, [], [outcomes], tmp_path / "mix",
+                                 override_reason="IT non ancora disponibile (#7)", **common)
+    mix = tmp_path / "mix"
+    assert manifest["output"]["sha256"] == hashlib.sha256((mix / "mix.jsonl").read_bytes()).hexdigest()
+    assert manifest["ingest_report"]["sha256"] == manifest["inputs"]["ingest"]["report_sha256"]
+    assert manifest["repo_sha"] == "c" * 40
+    assert manifest["override_reason"] == "IT non ancora disponibile (#7)"
+    assert manifest["inputs"]["outcomes"][0]["name"] == "outcomes.jsonl"
+    assert json.loads((mix / "mix-manifest.json").read_text()) == manifest
+    rows = [json.loads(line) for line in (mix / "mix.jsonl").read_text().splitlines()]
+    assert len(rows) == manifest["output"]["rows"]
+    assert {r["task"] for r in rows} == {"semantic", "difficulty"}
+
+
+def test_mix_output_inside_the_repository_is_refused(tmp_path, monkeypatch):
+    with pytest.raises(ValueError):
+        mix_cli.check_outside_repo(mix_cli.REPO_ROOT / "mix")
+
+
+def test_volume_judging_needs_the_human_confirmation_of_each_teacher(tmp_path, monkeypatch):
+    monkeypatch.setenv("SCUDO_TEST_KEY", "k-not-real")
+    out = tmp_path / "judge"
+    out.mkdir()
+    (out / "sample.jsonl").write_text(json.dumps({
+        "set": "volume", "key": "harm:1:prompt", "criterion": "c", "evidence": "e"}) + "\n")
+    teachers = tmp_path / "teachers.toml"
+    teachers.write_text(toml([CONFIG]), encoding="utf-8")
+    ledger = tmp_path / "ledger.jsonl"
+    with pytest.raises(BudgetError, match="conferma umana"):
+        mix_cli.judge(out, teachers, ledger, confirm="0.01")
+    confirm_volume(Ledger(ledger), teacher="Qwen/Qwen3.5-397B-A17B", amount_usd=10,
+                   by="persona", rationale="scelta dal report del pilot")
+    with pytest.raises(BudgetError, match="senza conferma del volume"):
+        mix_cli.judge(out, teachers, ledger, confirm="0.01")
+    assert not (out / "outcomes.jsonl").exists()
+
+
+def test_dirty_work_tree_is_refused(tmp_path):
+    subprocess.run(["git", "init", "-q", str(tmp_path)], check=True)
+    (tmp_path / "file.txt").write_text("x")
+    with pytest.raises(MixError, match="modifiche"):
+        mix_cli.repo_sha(tmp_path)

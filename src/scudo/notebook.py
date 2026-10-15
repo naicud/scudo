@@ -1,14 +1,13 @@
 """Genera il notebook Colab del tracer veloce (issue #2).
 
-Il notebook è un artefatto generato: le celle vivono qui come stringhe Python e
+Il notebook è un artefatto generato: le celle proprie vivono qui come stringhe
+Python, setup, LoRA, addestramento, adapter e GGUF in `scudo.notebook_cells`, e
 `python -m scudo.notebook` riscrive `notebooks/fast_tracer.ipynb`. Solo standard
 library; le dipendenze pesanti vengono importate dentro le celle, su Colab.
 """
 
-import json
-from pathlib import Path
-
 from scudo import nemotron
+from scudo.notebook_cells import ADAPTER, GGUF, LORA, SETUP, TRAIN, named, notebook, write
 
 NOTEBOOK_PATH = "notebooks/fast_tracer.ipynb"
 
@@ -30,47 +29,6 @@ Prerequisiti:
 
 Questo notebook e' una prova locale (checkpoint in training), non la prova live
 nel backend nativo."""
-
-SETUP = """\
-!nvidia-smi
-
-import json
-import os
-import shutil
-import subprocess
-import sys
-
-from google.colab import userdata
-
-os.environ["HF_TOKEN"] = userdata.get("HF_TOKEN")  # mai stampato
-GH_TOKEN = userdata.get("GH_TOKEN")
-
-SCUDO_REF = "main"
-REPO_DIR = "/content/scudo"
-RUN_LOG = {}
-
-if os.path.isdir(REPO_DIR):
-    shutil.rmtree(REPO_DIR)
-try:
-    # Output catturato: l'URL con il token non deve finire nei log.
-    subprocess.run(
-        ["git", "clone", "--quiet",
-         f"https://x-access-token:{GH_TOKEN}@github.com/naicud/scudo.git", REPO_DIR],
-        check=True, capture_output=True, env={**os.environ, "GIT_TERMINAL_PROMPT": "0"},
-    )
-except subprocess.CalledProcessError:
-    raise RuntimeError("clone di naicud/scudo fallito: controlla il secret GH_TOKEN") from None
-subprocess.run(["git", "-C", REPO_DIR, "remote", "set-url", "origin",
-                "https://github.com/naicud/scudo.git"], check=True)
-subprocess.run(["git", "-C", REPO_DIR, "checkout", "--quiet", SCUDO_REF], check=True)
-RUN_LOG["scudo_ref"] = SCUDO_REF
-RUN_LOG["scudo_sha"] = subprocess.run(
-    ["git", "-C", REPO_DIR, "rev-parse", "HEAD"], check=True, capture_output=True, text=True
-).stdout.strip()
-print("scudo", RUN_LOG["scudo_sha"])
-
-!pip install -q -e "/content/scudo[train]"
-sys.path.insert(0, f"{REPO_DIR}/src")  # l'editable install non e' visibile al kernel gia' avviato"""
 
 CONFIG = """\
 from scudo import nemotron
@@ -176,96 +134,6 @@ base_ids = tok.encode(sample_prompt, add_special_tokens=False)
 assert tok.encode(sample_prompt + "A", add_special_tokens=False) == base_ids + [LETTER_IDS["A"]]
 print("lettere", LETTER_IDS, "- prompt di esempio:", len(base_ids), "token")"""
 
-LORA = """\
-# Qwen3.5-4B: 8 layer full_attention (q/k/v/o_proj) e 24 linear_attention
-# (in_proj_qkv, in_proj_z, out_proj), letti da config e indice dei pesi alla
-# revisione fissata; senza questi ultimi la LoRA toccherebbe solo 8 layer su 32.
-model = FastLanguageModel.get_peft_model(
-    model,
-    r=RUN["lora_r"],
-    target_modules=[
-        "q_proj", "k_proj", "v_proj", "o_proj",
-        "in_proj_qkv", "in_proj_z", "out_proj",
-        "gate_proj", "up_proj", "down_proj",
-    ],
-    lora_alpha=RUN["lora_alpha"],
-    lora_dropout=0,
-    bias="none",
-    use_gradient_checkpointing="unsloth",
-    random_state=SEED,
-)
-model.print_trainable_parameters()"""
-
-TRAIN = """\
-import hashlib
-
-from huggingface_hub import HfApi, hf_hub_download, list_repo_files, snapshot_download
-from transformers.trainer_utils import get_last_checkpoint
-from trl import SFTConfig, SFTTrainer
-
-OUTPUT_DIR = "/content/run"
-os.makedirs(OUTPUT_DIR, exist_ok=True)
-
-# Un checkpoint si riprende solo se viene dalla stessa configurazione di run.
-RUN_FINGERPRINT = hashlib.sha256(
-    json.dumps({**RUN, "format": FORMAT_VERSION}, sort_keys=True).encode()
-).hexdigest()
-RUN_LOG["run_fingerprint"] = RUN_FINGERPRINT
-HfApi().create_repo(CKPT, private=True, exist_ok=True)
-remote_files = list_repo_files(CKPT)
-if "run_config.json" in remote_files:
-    with open(hf_hub_download(CKPT, "run_config.json"), encoding="utf-8") as handle:
-        stored = json.load(handle)
-    if stored["fingerprint"] != RUN_FINGERPRINT:
-        raise RuntimeError(
-            "checkpoint di un'altra configurazione: usa un altro checkpoint_repo o svuotalo"
-        )
-else:
-    HfApi().upload_file(
-        path_or_fileobj=json.dumps(
-            {"fingerprint": RUN_FINGERPRINT, "run": RUN, "format": FORMAT_VERSION}, indent=2
-        ).encode(),
-        path_in_repo="run_config.json", repo_id=CKPT, commit_message="configurazione del run",
-    )
-
-# Ripresa: prima un checkpoint locale, poi `last-checkpoint/` sul checkpoint repo.
-resume = get_last_checkpoint(OUTPUT_DIR)
-if resume is None:
-    if any(name.startswith("last-checkpoint/") for name in remote_files):
-        snapshot_download(CKPT, allow_patterns="last-checkpoint/*", local_dir=OUTPUT_DIR)
-        resume = f"{OUTPUT_DIR}/last-checkpoint"
-print("ripresa da:", resume)
-
-config = SFTConfig(
-    output_dir=OUTPUT_DIR,
-    per_device_train_batch_size=RUN["batch_size"],
-    gradient_accumulation_steps=RUN["grad_accum"],
-    num_train_epochs=RUN["epochs"],
-    learning_rate=RUN["learning_rate"],
-    warmup_ratio=0.03,
-    lr_scheduler_type="linear",
-    save_strategy="steps",
-    save_steps=RUN["save_steps"],
-    save_total_limit=2,
-    push_to_hub=True,
-    hub_model_id=CKPT,
-    hub_strategy="checkpoint",
-    hub_private_repo=True,
-    completion_only_loss=True,
-    max_length=RUN["max_seq_length"],
-    bf16=True,
-    logging_steps=5,
-    report_to="none",
-    seed=SEED,
-)
-trainer = SFTTrainer(
-    model=model, processing_class=tok, train_dataset=dataset, args=config
-)
-trainer.train(resume_from_checkpoint=resume)
-RUN_LOG["resumed_from"] = resume
-RUN_LOG["global_step"] = trainer.state.global_step
-print("global_step finale:", trainer.state.global_step)"""
-
 EVAL = """\
 import torch
 import unsloth
@@ -276,19 +144,7 @@ from scudo.artifacts import ArtifactIdentity, file_sha256
 from scudo.eval_report import EvalResult, build_report
 from scudo.protocol import read_options
 
-FastLanguageModel.for_inference(model)
-api = HfApi()
-
-# Adapter: salvato, hashato e caricato; l'identita' usa lo SHA del commit di upload.
-ADAPTER_DIR = Path("/content/adapter")
-model.save_pretrained(str(ADAPTER_DIR))
-adapter_sha = file_sha256(ADAPTER_DIR / "adapter_model.safetensors")
-commit = api.upload_folder(
-    folder_path=str(ADAPTER_DIR), repo_id=CKPT, path_in_repo="adapter",
-    commit_message="adapter del tracer",
-)
-adapter_identity = ArtifactIdentity(CKPT, commit.oid, "adapter_model.safetensors", adapter_sha)
-RUN_LOG["adapter"] = adapter_identity.manifest_entry()
+""" + named(ADAPTER, "del tracer") + """
 
 # Eval locale: logit dell'ultima posizione sugli id di A/B/C, nessuna generazione.
 held_rows = training_rows(held_cases, seed=SEED)
@@ -347,38 +203,6 @@ for lang, metrics in report["by_language"].items():
     print(f"{lang}: accuratezza {metrics['accuracy']:.3f} su {metrics['cases']} casi")
 print(f"totale: {report['overall']['accuracy']:.3f}, errori {report['overall']['errors']}")"""
 
-GGUF = """\
-from scudo.artifacts import load_verified
-
-GGUF_DIR = Path("/content/gguf")
-model.save_pretrained_gguf(str(GGUF_DIR), tokenizer, quantization_method="q8_0")
-
-# Il converter puo' scrivere anche il proiettore multimodale: va escluso.
-candidates = [
-    p for root in (GGUF_DIR, Path("/content/gguf_gguf")) if root.is_dir()
-    for p in root.rglob("*.gguf") if "mmproj" not in p.name
-]
-assert len(candidates) == 1, f"attesi un solo GGUF, trovati: {candidates}"
-gguf_path = candidates[0]
-gguf_sha = file_sha256(gguf_path)
-
-commit = api.upload_file(
-    path_or_fileobj=str(gguf_path), path_in_repo=f"gguf/{gguf_path.name}",
-    repo_id=CKPT, commit_message="GGUF q8_0 del tracer",
-)
-gguf_identity = ArtifactIdentity(CKPT, commit.oid, gguf_path.name, gguf_sha)
-
-# Rilettura dal Hub: il digest deve passare prima che qualsiasi loader tocchi il file.
-downloaded = Path(hf_hub_download(
-    CKPT, f"gguf/{gguf_path.name}", revision=gguf_identity.revision
-))
-size = load_verified(
-    downloaded, ArtifactIdentity(CKPT, commit.oid, downloaded.name, gguf_sha),
-    lambda p: p.stat().st_size,
-)
-print("GGUF verificato:", gguf_path.name, size, "byte", gguf_sha)
-RUN_LOG["gguf"] = gguf_identity.manifest_entry()"""
-
 SUMMARY = """\
 # Da incollare nell'issue #2: SHA di scudo, base, dataset, ripresa, step,
 # identita' di adapter e GGUF, accuratezze.
@@ -402,43 +226,18 @@ CELLS = (
     ("code", "lora", LORA),
     ("code", "train", TRAIN),
     ("code", "eval-local", EVAL),
-    ("code", "gguf", GGUF),
+    ("code", "gguf", named(GGUF, "del tracer")),
     ("code", "summary", SUMMARY),
     ("markdown", "outro", OUTRO),
 )
 
 
-def _lines(text: str) -> list[str]:
-    return text.splitlines(keepends=True)
-
-
-def _cell(kind: str, name: str, text: str) -> dict:
-    cell = {"cell_type": kind, "id": f"scudo-{name}", "metadata": {}, "source": _lines(text)}
-    if kind == "code":
-        cell.update(outputs=[], execution_count=None)
-    return cell
-
-
 def build() -> dict:
-    return {
-        "cells": [_cell(*cell) for cell in CELLS],
-        "metadata": {
-            "accelerator": "GPU",
-            "colab": {"gpuType": "A100", "provenance": []},
-            "kernelspec": {"display_name": "Python 3", "language": "python", "name": "python3"},
-            "language_info": {"name": "python"},
-        },
-        "nbformat": 4,
-        "nbformat_minor": 5,
-    }
+    return notebook(CELLS)
 
 
 def main() -> None:
-    root = Path(__file__).resolve().parents[2]
-    target = root / NOTEBOOK_PATH
-    target.parent.mkdir(parents=True, exist_ok=True)
-    target.write_text(json.dumps(build(), indent=1, ensure_ascii=False) + "\n", encoding="utf-8")
-    print(target)
+    print(write(NOTEBOOK_PATH, build()))
 
 
 if __name__ == "__main__":

@@ -10,7 +10,8 @@ HEAVY_MODULES = ("torch", "unsloth", "transformers", "datasets", "huggingface_hu
                                     "scudo.teacher_client", "scudo.benchmarks", "scudo.runner",
                                     "scudo.eval_notebook", "scudo.reasoned", "scudo.reasoning_data",
                                     "scudo.accurate_notebook", "scudo.reasoned_runner",
-                                    "scudo.italian"])
+                                    "scudo.italian", "scudo.difficulty", "scudo.mix",
+                                    "scudo.mix_cli", "scudo.fast_notebook", "scudo.notebook_cells"])
 def test_import_does_not_load_training_stack(module):
     probe = (
         f"import sys, {module}\n"

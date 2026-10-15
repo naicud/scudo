@@ -92,6 +92,10 @@ Per il costruttore del mix:
 - conflitti di label sullo stesso testo: 39 testi sono sia jailbreak sia
   regular in in-the-wild, 12 jailbreak di jackhhao sono regular in in-the-wild.
 
+Il costruttore del mix (`scudo.mix_cli`) toglie duplicati e conflitti e accetta i
+casi `needs_relabel` solo con la conferma della giuria di teacher: vedi
+[`fast-v01.md`](fast-v01.md).
+
 ## Ragionamenti dell'Accurate
 
 `Case` non porta un ragionamento: le fonti con ragionamenti seguono un

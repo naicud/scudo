@@ -69,6 +69,13 @@ Il completamento è una sola lettera, `A`, `B` o `C`.
 - La riga contiene anche `verdict`, `semantic_ids`, `source`, `language`, `source_id` e
   `surface` per audit. Il trainer deve usare solo `prompt` e `completion`.
 
+### Criterio di difficoltà
+
+Le righe del criterio di difficoltà (`routing.difficulty/1` di open-guard) usano
+lo stesso renderer e la stessa evidenza della riga semantica del caso, con
+completamento VIOLATION (difficile) o NO_VIOLATION (facile). Testo, golden e
+lettura nel backend nativo in [`fast-v01.md`](fast-v01.md).
+
 ## Serving
 
 Il serving legge i logit dei token `A`, `B`, `C` all'ultima posizione, senza
