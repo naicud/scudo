@@ -2,7 +2,7 @@
 
 Una riga dà un caso sulla richiesta (superficie `prompt`, evidenza = prompt) e,
 se la risposta ha una label, un caso sulla risposta (superficie `response`,
-evidenza = sola risposta, come la superficie output del gateway). Restano fuori
+evidenza = sola risposta, come fa il gateway sulla risposta del modello). Restano fuori
 le righe `refusal_data_augmentation` (rifiuti generati con Gemma, termini propri)
 e i prompt `REDACTED`. Il tracer non costruisce casi INSUFFICIENT (issue #6).
 Lo schema è quello di Aegis 2.0 (`scudo.aegis`), con la colonna `language`; in

@@ -94,6 +94,8 @@ def test_report_header_rejects_missing_or_malformed_identity():
     with pytest.raises(ValueError):
         build(ok, scudo_sha="main")
     with pytest.raises(ValueError):
+        build(ok, scudo_sha="a" * 40 + "\n")
+    with pytest.raises(ValueError):
         build(ok, runtime={"name": "transformers"})
     with pytest.raises(ValueError):
         build(ok, runtime={"name": "", "version": "5.17.0"})

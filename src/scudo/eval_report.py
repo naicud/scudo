@@ -24,7 +24,7 @@ ProofType = Literal["local", "live", "reference"]
 PROOF_TYPES: tuple[ProofType, ...] = ("local", "live", "reference")
 ERROR = "ERROR"
 ECE_BINS = 10  # bin di uguale ampiezza su [0, 1]
-_SHA = re.compile(r"^[0-9a-f]{40}$")
+_SHA = re.compile(r"[0-9a-f]{40}")
 
 
 @dataclass(frozen=True)
@@ -152,7 +152,7 @@ def build_report(
         raise ValueError("servono le identità dei pesi")
     if proof_type == "live" and not all(w.filename.endswith(".gguf") for w in weights):
         raise ValueError("la prova live riguarda il GGUF nel backend nativo")
-    if not _SHA.match(scudo_sha):
+    if not _SHA.fullmatch(scudo_sha):
         raise ValueError("scudo_sha deve essere uno SHA di commit completo")
     if set(runtime) != {"name", "version"} or not all(runtime.values()):
         raise ValueError("runtime: servono name e version non vuoti")

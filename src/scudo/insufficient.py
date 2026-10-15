@@ -142,7 +142,10 @@ def derive_all(cases: Iterable[Case], methods: Sequence[str] = METHODS) -> tuple
 
 
 def _key(seed: int, case: Case) -> str:
-    return hashlib.sha256(f"{seed}:{case.source}:{case.source_id}:{case.surface}".encode()).hexdigest()
+    # Tutti i campi: due casi con la stessa chiave sono uguali, quindi l'ordine non conta.
+    fields = (case.source, case.source_id, case.language, case.surface, case.criterion,
+              case.evidence, case.verdict)
+    return hashlib.sha256(json.dumps([seed, *fields]).encode()).hexdigest()
 
 
 def mix_insufficient(cases: Sequence[Case], generated: Sequence[Case], *,

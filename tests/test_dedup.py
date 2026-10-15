@@ -45,3 +45,10 @@ def test_first_benchmark_wins_and_counts_per_benchmark():
     index.add("b", BENCH)
     assert index.match(BENCH) == ("exact", "a")
     assert index.sizes == {"a": 1, "b": 1}
+
+
+def test_punctuation_only_benchmark_text_does_not_match_other_punctuation():
+    index = Index()
+    index.add("a", "?!")
+    assert index.match("...") is None
+    assert index.sizes == {"a": 1}

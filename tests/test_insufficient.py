@@ -236,3 +236,9 @@ def test_mix_fails_rather_than_under_filling_or_overshooting():
 def test_mix_rejects_generated_cases_that_are_not_insufficient():
     with pytest.raises(ValueError):
         mix_insufficient(base_cases(100), base_cases(10), seed=0)
+
+
+def test_mix_does_not_depend_on_order_when_languages_share_an_id():
+    base = [replace(case, language=language) for case in base_cases(60) for language in ("it", "en")]
+    assert (mix_insufficient(base, pool(20), seed=3)
+            == mix_insufficient(list(reversed(base)), pool(20), seed=3))

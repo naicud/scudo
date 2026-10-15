@@ -35,3 +35,13 @@ def test_attributions_cover_cc_by_and_odc_by_training_sources_only():
 def test_every_shipped_entry_renders():
     for entry in load():
         assert entry.id in render(entry)
+
+
+def test_risk_text_containing_a_dash_list_marker_is_kept_verbatim():
+    from dataclasses import replace
+
+    from scudo.datacard import render
+    from scudo.manifest import load
+
+    entry = replace(load()[0], risks=("vedi  - nota interna",))
+    assert "- vedi  - nota interna" in render(entry, None)

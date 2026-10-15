@@ -16,8 +16,8 @@ LICENSE_URLS = {
 _PENDING = "pendente (nessuna build registrata)"
 
 
-def _items(values) -> str:
-    return "\n".join(f"  - {value}" for value in values)
+def _items(values, indent: str = "  ") -> str:
+    return "\n".join(f"{indent}- {value}" for value in values)
 
 
 def _counts(counts: dict) -> str:
@@ -97,7 +97,7 @@ Generata da `src/scudo/manifest.toml`; ruolo `{entry.role}`.
 
 ## Rischi noti
 
-{_items(entry.risks).replace("  - ", "- ")}
+{_items(entry.risks, indent="")}
 """
 
 

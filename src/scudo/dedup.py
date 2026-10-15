@@ -76,6 +76,8 @@ class Index:
 
     def add(self, benchmark: str, text: str) -> None:
         self.sizes[benchmark] = self.sizes.get(benchmark, 0) + 1
+        if not normalize(text):  # solo punteggiatura: non c'è testo da confrontare
+            return
         self._exact.setdefault(digest(text), benchmark)
         sig = signature(text)
         if sig is None:
@@ -86,6 +88,8 @@ class Index:
 
     def match(self, text: str) -> tuple[str, str] | None:
         """("exact" | "near", benchmark) del primo benchmark indicizzato che combacia."""
+        if not normalize(text):
+            return None
         if (benchmark := self._exact.get(digest(text))) is not None:
             return "exact", benchmark
         sig = signature(text)
