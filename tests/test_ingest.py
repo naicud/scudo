@@ -5,8 +5,18 @@ from pathlib import Path
 import pytest
 
 from scudo import aegis, canttalk, procedural
-from scudo.ingest import CONVERTERS, REPO_ROOT, UNCONVERTED, build, check_outside_repo
-from scudo.manifest import ManifestError
+from scudo.ingest import (
+    CONVERTERS,
+    DEDUP_PARAMS,
+    REPO_ROOT,
+    UNCONVERTED,
+    build,
+    check_outside_repo,
+    main,
+    manifest_digest,
+    verify_dedup,
+)
+from scudo.manifest import ManifestError, benchmarks
 from test_manifest import BENCH, TRAIN
 
 BENCH_PROMPT = "How can I kill a Python process that is stuck in an infinite loop on Linux?"
@@ -165,3 +175,54 @@ def test_attributions_list_only_sources_that_produced_data(tmp_path):
     assert cc_by.title not in (tmp_path / "data-cards" / "ATTRIBUTIONS.md").read_text()
     write_cards(tmp_path, [cc_by, HELD])  # solo manifest: tutte le fonti di training
     assert cc_by.title in (tmp_path / "data-cards" / "ATTRIBUTIONS.md").read_text()
+
+
+def test_verify_passes_only_when_every_registry_benchmark_was_indexed(tmp_path):
+    report = build(tmp_path / "out", entries=[AEGIS, HELD], loader=loader)
+    result = verify_dedup(report, entries=[AEGIS, HELD], manifest_sha256="a" * 64)
+    assert result["status"] == "FAIL"  # report di un manifest senza digest
+    report["manifest_sha256"] = "a" * 64
+    result = verify_dedup(report, entries=[AEGIS, HELD], manifest_sha256="a" * 64)
+    assert result == {"status": "PASS", "manifest_sha256": "a" * 64,
+                      "report_manifest_sha256": "a" * 64, "indexed": {"bench": 3},
+                      "problems": []}
+
+
+def test_verify_fails_when_a_benchmark_is_missing_or_empty_in_the_report(tmp_path):
+    report = build(tmp_path / "out", entries=[AEGIS, HELD], loader=loader)
+    report["manifest_sha256"] = "a" * 64
+    other = replace(HELD, name="nemotron3-test")
+    result = verify_dedup(report, entries=[AEGIS, HELD, other], manifest_sha256="a" * 64)
+    assert result["status"] == "FAIL"
+    assert result["problems"] == ["nemotron3-test: non indicizzato dalla deduplica"]
+    report["benchmarks"]["bench"]["texts"] = 0
+    result = verify_dedup(report, entries=[AEGIS, HELD], manifest_sha256="a" * 64)
+    assert result["problems"] == ["bench: non indicizzato dalla deduplica"]
+
+
+def test_verify_fails_on_other_manifest_or_other_dedup_parameters(tmp_path):
+    report = build(tmp_path / "out", entries=[AEGIS, HELD], loader=loader)
+    report["manifest_sha256"] = "b" * 64
+    assert verify_dedup(report, entries=[AEGIS, HELD], manifest_sha256="a" * 64)["problems"]
+    report["manifest_sha256"] = "a" * 64
+    report["dedup"]["threshold"] = 0.5
+    [problem] = verify_dedup(report, entries=[AEGIS, HELD], manifest_sha256="a" * 64)["problems"]
+    assert "parametri" in problem
+
+
+def test_shipped_registry_requires_wildguardtest_in_the_dedup_report():
+    # Oggi il cancello blocca la build (WildGuardTest senza campi verificati): nessun
+    # report passa la verifica finché WildGuardTest non è indicizzato.
+    indexed = {b.name: {"texts": 10} for b in benchmarks() if b.name != "wildguardtest"}
+    report = {"manifest_sha256": manifest_digest(), "dedup": dict(DEDUP_PARAMS),
+              "benchmarks": indexed}
+    result = verify_dedup(report)
+    assert result["status"] == "FAIL"
+    assert result["problems"] == ["wildguardtest: non indicizzato dalla deduplica"]
+
+
+def test_verify_cli_exits_one_on_fail(tmp_path, capsys):
+    path = tmp_path / "report.json"
+    path.write_text(json.dumps({"manifest_sha256": None, "dedup": {}, "benchmarks": {}}))
+    assert main(["verify", "--report", str(path)]) == 1
+    assert '"status": "FAIL"' in capsys.readouterr().out

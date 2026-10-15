@@ -1,9 +1,10 @@
 # Harness di eval: metriche e baseline
 
 Un solo harness misura il generalista e le **baseline** (`CONTEXT.md`) sugli
-stessi casi. Fonte: `src/scudo/eval_report.py`, `src/scudo/baselines.py`; test
-in `tests/test_eval_report.py` e `tests/test_baselines.py`. Il formato del
-prompt di Scudo è in [`protocol.md`](protocol.md).
+stessi casi. Fonte: `src/scudo/eval_report.py`, `src/scudo/baselines.py`,
+`src/scudo/benchmarks.py`, `src/scudo/runner.py`, `src/scudo/eval_notebook.py`;
+test omonimi in `tests/`. Il formato del prompt di Scudo è in
+[`protocol.md`](protocol.md).
 
 ## Report
 
@@ -99,12 +100,12 @@ APUS è lo stato/evidenza della loro richiesta.
 - **Baseline generative** (Granite policy, Guardian, Qwen3Guard): la card
   documenta solo il testo. Il runner può leggere, nel passo di generazione
   greedy che emette l'etichetta, i logit del primo token di ogni etichetta:
-  è una lettura di Scudo, non dichiarata dalle card. Si usa solo se i primi
-  token delle etichette sono distinti (il runner lo verifica sul tokenizer
-  della revisione fissata); altrimenti nessun logit e `calibration` resta
-  `null` per quel modello. Il verdetto viene sempre dal testo: se l'argmax dei
-  logit non coincide con l'etichetta generata, l'esito è l'errore
-  `LOGIT_TEXT_MISMATCH`.
+  è una lettura di Scudo, non dichiarata dalle card. Il runner verifica sul
+  tokenizer della revisione fissata che i primi token delle etichette siano
+  distinti, attaccati e dopo uno spazio; altrimenti rifiuta la baseline
+  (`LABEL_TOKENS_NOT_DISTINCT`), senza ripiegare sul solo testo. Il verdetto
+  viene sempre dal testo: se l'argmax dei logit non coincide con l'etichetta
+  generata, l'esito è l'errore `LOGIT_TEXT_MISMATCH`.
 - **Binario** (Guardian): la probabilità di INSUFFICIENT è 0, perché il
   modello non può esprimerlo; Brier ed ECE lo contano così.
 
@@ -168,11 +169,110 @@ NO_VIOLATION). La superficie `response` è **UNSUPPORTED**: il template ignora
 un primo messaggio `assistant`, e i casi `response` di Scudo non portano il
 prompt che ha prodotto la risposta. La card dichiara 119 lingue.
 
-## Fuori da questa slice
+## Benchmark
 
-- Loader dei benchmark verso `Case` e notebook Colab dell'eval: wave
-  successiva, sopra manifest, registro dei benchmark e deduplica.
-- Verifica che i benchmark di eval siano esclusi dal training: dalla deduplica
-  dell'ingestione.
-- Runner delle baseline: carica i pesi alla revisione fissata, ne verifica i
-  digest (`weights`), applica il chat template, legge testo e logit.
+`scudo.benchmarks.load_cases(entry, loader)` converte un benchmark del registro
+(`scudo.manifest.benchmarks()`) in casi. Schemi letti il 15 ottobre 2026 alla
+revisione del manifest (first-rows e statistiche di datasets-server, README,
+paper) e provati sui dati reali a quelle revisioni. Ogni convertitore porta la
+revisione su cui è stato verificato: un'altra revisione è `REVISION_MISMATCH`.
+Colonna mancante (`SCHEMA_MISMATCH`) e label fuori schema (`LABEL_UNKNOWN`)
+sono errori, mai righe scartate; le esclusioni volute si contano per motivo in
+`dropped`. Casi fuori dalle superfici o lingue del registro:
+`REGISTRY_MISMATCH`.
+
+| Benchmark | Label → verdetto, superficie | Criterio | Casi (esclusi) |
+| --- | --- | --- | --- |
+| `aegis2-test` | `unsafe` → VIOLATION, `safe` → NO_VIOLATION; prompt → `prompt`, risposta → `response` (`scudo.aegis`) | `HARMFUL_REQUEST`, `HARMFUL_RESPONSE` | 2741 (36 prompt REDACTED) |
+| `nemotron3-test` | come Aegis (`scudo.nemotron`), solo it/en | come Aegis | 8251 (29488 lingua fuori da it/en, 72 REDACTED, 169 copie identiche, 34 id ripetuti con contenuto diverso) |
+| `xstest` | `safe` → `over_refusal` NO_VIOLATION; `unsafe` (contrasti) → `prompt` VIOLATION | `HARMFUL_REQUEST` | 450 |
+| `xstest-it` | come XSTest; `lang` English → en, Italian → it | `HARMFUL_REQUEST` | 900 (5 × 450 varietà regionali) |
+| `toxicchat-test` | `toxicity` 1/0 → `prompt` VIOLATION/NO_VIOLATION; `jailbreaking` 1/0 → `injection_direct` VIOLATION/NO_VIOLATION | `HARMFUL_REQUEST`; `JAILBREAK_ATTEMPT` | 10166 (due per prompt) |
+| `jbb-behaviors` | split `harmful` → `prompt` VIOLATION; `benign` → `over_refusal` NO_VIOLATION | `HARMFUL_REQUEST` | 200 |
+| `orbench-hard` | tutte le righe → `over_refusal` NO_VIOLATION | `HARMFUL_REQUEST` | 1319 |
+| `wildguardtest` | **rifiutato**: gated, campi NON VERIFICATI (`SCHEMA_NOT_VERIFIED`) e nessun convertitore | — | — |
+
+Note:
+
+- **Label non umane.** Le label `llm_jury` di Aegis e Nemotron e le righe di
+  ToxicChat con `human_annotation` falso (escluse dal filtro Perspective API,
+  paper §2.2) non sono gold: restano nel benchmark com'è pubblicato e i loro id
+  sono in `machine_labelled`. Il notebook scrive anche il report
+  `<benchmark>/human-labels` sulle sole label umane.
+- **Nemotron v3 test** ripete 543 coppie (id, lingua), 186 in italiano, con
+  risposte e a volte `prompt_label` diverse. Per ogni id resta una copia se le
+  copie sono identiche; altrimenti escono tutte.
+- **XSTest e JBB.** I contrasti `unsafe` di XSTest misurano la recall sulla
+  superficie `prompt` (il manifest ora la elenca); i benigni di JBB servono al
+  tasso di rifiuto (paper §3.1), che segnala che una parte è borderline.
+- **OR-Bench-hard-1k** contiene solo prompt che sembrano tossici ma sono benigni
+  (README); la moderazione che li ha etichettati è un LLM (paper, non verificato
+  qui).
+- **`JAILBREAK_ATTEMPT`** è un criterio nostro, scritto sulla definizione di
+  `jailbreaking` di ToxicChat (paper §2.1: l'utente cerca deliberatamente di
+  ingannare il chatbot perché generi contenuto tossico, con testo in apparenza
+  innocuo). Chiedere direttamente contenuti vietati non è jailbreak.
+- Senza colonna id (XSTest-IT, OR-Bench) la riga è `<split>:<posizione>`; JBB
+  usa `<split>:<Index>`. L'id del caso è `<benchmark>:<riga>:<superficie>:<lingua>`.
+
+## Benchmark esclusi dal training
+
+`python -m scudo.ingest verify --report <out>/report.json` (`verify_dedup`) dà
+PASS solo se il report della build viene dal manifest del pacchetto (stesso
+SHA-256), usa gli stessi parametri di deduplica e ha indicizzato almeno un testo
+per **ogni** benchmark del registro; altrimenti FAIL con i motivi ed esce con 1.
+Un report che salta un benchmark (es. Nemotron v3 test o WildGuardTest) fallisce.
+Oggi nessuna build può passarla: il cancello blocca finché WildGuardTest non ha
+campi verificati. Ogni report di eval cita il risultato in
+`dedup_verification` (`NOT_RUN` se il report di ingestione non è configurato).
+
+## Runner
+
+`scudo.runner`: Python puro sopra due interfacce, tokenizer e backend
+(`next_logits` all'ultima posizione, `generate` greedy con i logit grezzi di
+ogni passo); torch, transformers, peft e huggingface_hub solo dentro le funzioni
+di caricamento.
+
+- **Pesi.** `fetch_verified` legge i metadati del Hub alla revisione fissata
+  (`model_info(files_metadata=True)`), scarica i file scelti e li verifica
+  tutti prima di transformers: SHA-256 dei file LFS con `load_verified`, id del
+  blob git per gli altri (config, tokenizer, codice remoto). Le identità dei
+  `.safetensors` vanno in `weights`.
+- **Fast.** Prompt di `protocol.training_row` con permutazione da
+  `Random(seed)`, nessun chat template, logit di A, B, C, `read_options`.
+- **Lettori di opzioni** (Rizzo): chat template della card, logit delle lettere.
+- **Generative** (Granite policy, Guardian, Qwen3Guard): chat template, greedy
+  (`do_sample=False`), testo al parser della card; i logit si leggono al primo
+  passo il cui token apre l'etichetta come parola intera. Se quel token non
+  c'è (etichetta fusa con il carattere precedente): `LABEL_TOKEN_NOT_FOUND`.
+  `max_new_tokens`: 20 (card Granite policy), 128 (card Qwen3Guard), 64 per
+  Guardian (scelta nostra: la card usa vLLM con 2048 e la modalità no-think
+  emette solo `<score>`).
+- **Errori.** `BaselineError`/`RunnerError` di un caso e readout malformati
+  diventano il `code` del risultato; altre eccezioni fermano il run.
+
+Verificato con fake nei test e sui tokenizer reali alle revisioni fissate
+(15 ottobre 2026): lettere A, B, C a token singolo e distinte per tutte le
+baseline e per Qwen3.5-4B; primi token delle etichette distinti in entrambe le
+forme per Granite policy, Guardian e Qwen3Guard; il passo trovato è quello
+dell'etichetta sulle uscite d'esempio delle card. Caricamento dei modelli e
+generazione si verificano solo su Colab.
+
+**Rifiutate dal runner**, con `UNSUPPORTED`:
+
+- **Rizzo Flow**: `configuration_spark.py` alla revisione fissata non si carica
+  con transformers 5.17 (`validate_rope` fallisce sui `rope_parameters` per tipo
+  di attenzione); il `config.json` dichiara transformers 4.57.1 e la card non
+  fissa una versione. Serve un ambiente separato.
+- **APUS-Reflex**: runtime della card (`openjet_runtime`, `OpenJet.decide`) con
+  `transformers==5.16.1` e torch 2.8.0, incompatibile con l'extra `train`.
+
+## Notebook
+
+`python -m scudo.eval_notebook` genera `notebooks/eval.ipynb` (un test lo
+confronta con il file committato). Celle: setup, config, verifica della
+deduplica, caricamento dei benchmark, helper, una cella per baseline, il Fast
+per ultimo (Unsloth modifica transformers all'import), riepilogo. I report
+vanno in `Naicud/scudo-checkpoints` sotto `eval/<scudo_sha>/<modello>/`; il
+riepilogo per l'issue elenca verifica della deduplica, benchmark rifiutati,
+modelli saltati con il motivo e metriche principali.

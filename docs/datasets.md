@@ -113,4 +113,10 @@ manifest.
 
 `scudo.manifest.benchmarks()` restituisce le voci held-out (`name`, `id`,
 `config`, `splits`, `revision`, `license`, `text_fields`, ...): è il punto da
-cui partono i convertitori dell'eval.
+cui partono i convertitori dell'eval (`scudo.benchmarks`, vedi
+[`eval.md`](eval.md#benchmark)).
+
+`python -m scudo.ingest verify --report <out>/report.json` verifica che una
+build abbia deduplicato contro **tutti** i benchmark del registro, con lo
+stesso manifest e gli stessi parametri: un benchmark mancante o senza testi
+indicizzati dà FAIL (uscita 1).

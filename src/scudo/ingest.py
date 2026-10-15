@@ -9,6 +9,8 @@ label non gold (`needs_relabel`), rimuove i duplicati esatti e near-duplicate
 dei benchmark e scrive in DIR i casi JSONL, `report.json` e le data card. DIR
 deve stare fuori dal repository e da ogni work tree git: i dati restano nel
 perimetro autorizzato. `cards --out DIR` scrive solo le data card dal manifest.
+`verify --report DIR/report.json` controlla che la deduplica di quella build
+abbia indicizzato ogni benchmark del registro ed esce con 1 altrimenti.
 """
 
 import argparse
@@ -57,6 +59,13 @@ UNCONVERTED = {
         "l'unico esito (password rivelata) viene dalle risposte ChatGPT escluse"),
 }
 Loader = Callable[[Entry, str], Iterable[dict]]
+DEDUP_PARAMS = {"normalize": "NFKC+casefold+punteggiatura", "exact": "sha256",
+                "shingle": SHINGLE, "bins": BINS, "bands": BANDS, "rows": ROWS,
+                "threshold": THRESHOLD}
+
+
+def manifest_digest() -> str:
+    return hashlib.sha256(MANIFEST.read_bytes()).hexdigest()
 
 
 def _convert(converter, row: dict) -> tuple[list[Case], Counter]:
@@ -152,7 +161,7 @@ def write_cards(out: Path, entries: list[Entry], stats: dict | None = None) -> N
 
 def build(out: Path, *, entries: list[Entry] | None = None, loader: Loader | None = None) -> dict:
     """Build completa; il cancello e il controllo della cartella vengono prima di ogni download."""
-    digest = None if entries is not None else hashlib.sha256(MANIFEST.read_bytes()).hexdigest()
+    digest = None if entries is not None else manifest_digest()
     entries = load() if entries is None else entries
     gate(entries)
     out = check_outside_repo(out)
@@ -161,9 +170,7 @@ def build(out: Path, *, entries: list[Entry] | None = None, loader: Loader | Non
     index = _index(benchmarks(entries), loader)
     report = {
         "manifest_sha256": digest,
-        "dedup": {"normalize": "NFKC+casefold+punteggiatura", "exact": "sha256",
-                  "shingle": SHINGLE, "bins": BINS, "bands": BANDS, "rows": ROWS,
-                  "threshold": THRESHOLD},
+        "dedup": dict(DEDUP_PARAMS),
         "benchmarks": {bench.name: {"texts": index.sizes.get(bench.name, 0),
                                     "removed_exact": 0, "removed_near": 0}
                        for bench in benchmarks(entries)},
@@ -186,6 +193,29 @@ def build(out: Path, *, entries: list[Entry] | None = None, loader: Loader | Non
     return report
 
 
+def verify_dedup(report: dict, *, entries: list[Entry] | None = None,
+                 manifest_sha256: str | None = None) -> dict:
+    """PASS solo se il report viene da questo manifest, con questi parametri di
+    deduplica, e ha indicizzato almeno un testo per ogni benchmark del registro.
+
+    Senza `entries` vale il manifest del pacchetto con il suo digest.
+    """
+    if entries is None:
+        entries, manifest_sha256 = load(), manifest_digest()
+    problems = []
+    reported = report.get("manifest_sha256")
+    if reported is None or reported != manifest_sha256:
+        problems.append(f"report del manifest {reported}, atteso {manifest_sha256}")
+    if report.get("dedup") != DEDUP_PARAMS:
+        problems.append(f"parametri di deduplica {report.get('dedup')} diversi da {DEDUP_PARAMS}")
+    indexed = {name: stats.get("texts", 0)
+               for name, stats in (report.get("benchmarks") or {}).items()}
+    problems += [f"{bench.name}: non indicizzato dalla deduplica"
+                 for bench in benchmarks(entries) if not indexed.get(bench.name)]
+    return {"status": "FAIL" if problems else "PASS", "manifest_sha256": manifest_sha256,
+            "report_manifest_sha256": reported, "indexed": indexed, "problems": problems}
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(prog="python -m scudo.ingest",
                                      description=__doc__.split("\n")[0])
@@ -193,8 +223,14 @@ def main(argv: list[str] | None = None) -> int:
     commands.add_parser("check", help="cancello di licenza e provenienza sul manifest")
     for name in ("build", "cards"):
         commands.add_parser(name).add_argument("--out", required=True, type=Path)
+    commands.add_parser("verify", help="deduplica di una build contro tutto il registro"
+                        ).add_argument("--report", required=True, type=Path)
     args = parser.parse_args(argv)
     try:
+        if args.command == "verify":
+            result = verify_dedup(json.loads(args.report.read_text(encoding="utf-8")))
+            print(json.dumps(result, indent=2, ensure_ascii=False))
+            return int(result["status"] != "PASS")
         if args.command == "check":
             gate(load())
             print("manifest ammesso")
