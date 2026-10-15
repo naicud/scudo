@@ -153,7 +153,10 @@ uso o training.
 - Metodo: nella build, SHA-256 del testo normalizzato e near-duplicate MinHash (shingle di 5
   caratteri, 128 bin, LSH 25×5, Jaccard stimata >= 0,8), vedi `docs/datasets.md`. Nel
   tracer #2 resta solo il controllo interno per id e testo esatto tra test held-out e i
-  2.000 casi del campione di training passati a `heldout_cases`.
+  2.000 casi del campione di training passati a `heldout_cases`. Il campionamento tiene un
+  solo caso per (id, superficie, lingua): copie identiche contano una volta, id ripetuti con
+  testi diversi escono tutti (nel run del tracer a 756b6f7 otto casi held-out condividevano
+  l'id e si sovrascrivevano in `readouts_local.json`).
 - Righe rimosse: nessun conteggio finché la build non passa il cancello. Le righe del test
   di Nemotron v3 hanno gli stessi id di quelle del test di Aegis 2.0 (letto da
   datasets-server): sono traduzioni delle stesse righe.

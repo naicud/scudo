@@ -44,12 +44,20 @@ def _sample_key(seed: int, case: Case) -> str:
     return hashlib.sha256(f"{seed}:{case.source_id}:{case.surface}".encode()).hexdigest()
 
 
+def _unique(cases: Iterable[Case]) -> list[Case]:
+    """Un caso per (id, superficie, lingua): le copie identiche contano una volta, quelle
+    diverse escono tutte (lo split di test di Nemotron v3 ripete id con testi diversi)."""
+    groups: dict[tuple[str, str, str], set[Case]] = {}
+    for case in cases:
+        groups.setdefault((case.source_id, case.surface, case.language), set()).add(case)
+    return [next(iter(group)) for group in groups.values() if len(group) == 1]
+
+
 def sample_cases(rows: Iterable[dict], *, per_language: int, seed: int) -> list[Case]:
     """Campione deterministico, indipendente dall'ordine delle righe, uguale per lingua."""
     by_language: dict[str, list[Case]] = {language: [] for language in LANGUAGES}
-    for row in rows:
-        for case in cases_from_row(row):
-            by_language[case.language].append(case)
+    for case in _unique(case for row in rows for case in cases_from_row(row)):
+        by_language[case.language].append(case)
     sample = []
     for language in LANGUAGES:
         pool = sorted(by_language[language], key=lambda case: _sample_key(seed, case))

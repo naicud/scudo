@@ -144,3 +144,16 @@ def test_heldout_excludes_training_sources_and_identical_texts():
     assert len(held) == 12
     assert not any(case.source_id in train_ids for case in held)
     assert not any(case.evidence in train_texts for case in held)
+
+
+def test_repeated_id_in_a_language_is_kept_once_when_identical_and_dropped_when_different():
+    same = row(id_="s" * 32, language="it", prompt="Testo ripetuto identico")
+    clash_a = row(id_="c" * 32, language="it", prompt="Prima versione", prompt_label="safe")
+    clash_b = row(id_="c" * 32, language="it", prompt="Seconda versione", prompt_label="unsafe")
+    other = rows("it", 3) + rows("en", 4)
+    sample = sample_cases([same, same, clash_a, clash_b, *other], per_language=4, seed=0)
+    ids = [(case.source_id, case.language) for case in sample]
+    assert ids.count(("s" * 32, "it")) == 1
+    assert ("c" * 32, "it") not in ids
+    assert sample == sample_cases([clash_b, *reversed(other), same, clash_a, same],
+                                  per_language=4, seed=0)
