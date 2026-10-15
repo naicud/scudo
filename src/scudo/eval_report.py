@@ -139,6 +139,32 @@ def _grouped(results: Sequence[EvalResult], key: Callable[[EvalResult], str]) ->
     return {name: _summary(items) for name, items in sorted(groups.items())}
 
 
+def token_cost(generated: Sequence[int], *, budget: int) -> dict:
+    """Token generati per caso dal ragionamento (Accurate): media e percentili nearest-rank.
+
+    Va nel campo `token_cost` del report (`reasoned_runner.accurate_reports`).
+    """
+    if type(budget) is not int or budget < 1:
+        raise ValueError("budget: intero positivo")
+    if not generated or any(type(n) is not int or not 0 <= n <= budget for n in generated):
+        raise ValueError("servono conteggi interi fra 0 e il budget")
+    ordered = sorted(generated)
+
+    def rank(p: int) -> int:
+        return ordered[max(1, math.ceil(p / 100 * len(ordered))) - 1]
+
+    return {
+        "budget": budget,
+        "cases": len(ordered),
+        "mean": sum(ordered) / len(ordered),
+        "p50": rank(50),
+        "p90": rank(90),
+        "p99": rank(99),
+        "max": ordered[-1],
+        "at_budget": sum(n == budget for n in ordered),
+    }
+
+
 def build_report(
     results: Sequence[EvalResult],
     *,

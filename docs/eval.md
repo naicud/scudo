@@ -29,6 +29,23 @@ Le metriche stanno in `overall`, `by_language` (`it`, `en`, `mixed`) e
 `by_surface` (`prompt`, `response`, `injection_direct`, `injection_indirect`,
 `over_refusal`). Ogni gruppo ha gli stessi campi.
 
+Per l'Accurate (`format` = `scudo.reasoned-decision/1`) l'accuratezza è quella
+dopo il ragionamento, letta sugli score delle opzioni dopo `Answer:`. Il runner
+è lo stesso delle baseline (`load_cases`, `run`, `reports_for`); il passo
+ragionato è `scudo.reasoned_runner.accurate_scorer` e
+`accurate_reports` aggiunge a ogni report `token_cost`, da
+`eval_report.token_cost(generati, budget=...)`: per ogni caso del report in
+cui la generazione è partita, i token generati fino a quello che completa lo
+stop compreso, oppure tutti quelli generati (fine della generazione compresa)
+se lo stop manca. Campi: `budget`,
+`cases`, `mean`, `p50`, `p90`, `p99` (percentile nearest-rank: il valore di
+rango ⌈p/100 · n⌉ nei conteggi ordinati), `max`, `at_budget` (casi arrivati al
+budget). Il resto dello schema è identico a quello delle baseline e del Fast:
+i report si confrontano campo per campo; una baseline non ha `token_cost`.
+Ogni caso costa una generazione: il notebook dell'Accurate valuta un campione
+deterministico per benchmark (`benchmarks.sample`, chiave SHA-256 di seme e
+case_id) e lo dichiara in `benchmark.sample` (`cases`, `of`, `seed`).
+
 ## Metriche
 
 Ogni risultato è un `EvalResult(case_id, language, surface, gold, readout,

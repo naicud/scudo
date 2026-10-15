@@ -9,9 +9,10 @@ o senza convertitore viene rifiutato prima di scaricare qualsiasi riga.
 Mappature, criteri e limiti sono in `docs/eval.md`.
 """
 
+import hashlib
 from collections import Counter
 from collections.abc import Callable, Iterable
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 
 from scudo import aegis, canttalk, nemotron, open_jev
 from scudo.aegis import HARMFUL_REQUEST
@@ -271,3 +272,18 @@ def _unique(entry: Entry, sink: _Sink) -> list[tuple[str, Case, bool]]:
         else:
             sink.dropped["id ripetuto con contenuto diverso"] += len(group)
     return kept
+
+
+def sample(loaded: Loaded, size: int, *, seed: int) -> Loaded:
+    """Campione deterministico di `size` casi, indipendente dall'ordine delle righe.
+
+    Serve quando un caso costa una generazione (Accurate); `rows` e `dropped`
+    restano quelli del benchmark intero.
+    """
+    def key(item: tuple[str, Case]) -> str:
+        return hashlib.sha256(f"{seed}:{item[0]}".encode()).hexdigest()
+
+    chosen = sorted(zip(loaded.case_ids, loaded.cases, strict=True), key=key)[:size]
+    ids = tuple(case_id for case_id, _ in chosen)
+    return replace(loaded, cases=tuple(case for _, case in chosen), case_ids=ids,
+                   machine_labelled=loaded.machine_labelled & frozenset(ids))

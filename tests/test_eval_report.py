@@ -5,7 +5,7 @@ import pytest
 
 from scudo.artifacts import ArtifactIdentity
 from scudo.baselines import LabelReadout
-from scudo.eval_report import EvalResult, build_report
+from scudo.eval_report import EvalResult, build_report, token_cost
 from scudo.protocol import FORMAT_VERSION, read_options
 
 CANON = ("VIOLATION", "NO_VIOLATION", "INSUFFICIENT")
@@ -253,3 +253,16 @@ def test_unsupported_capability_is_reported_apart_not_as_an_error():
 def test_report_with_only_unsupported_results_is_rejected():
     with pytest.raises(ValueError):
         build([unsupported("en", "VIOLATION")])
+
+
+def test_token_cost_uses_nearest_rank_percentiles_and_counts_budget_hits():
+    cost = token_cost([10, 20, 30, 40, 512], budget=512)
+    assert cost == {"budget": 512, "cases": 5, "mean": 122.4, "p50": 30, "p90": 512,
+                    "p99": 512, "max": 512, "at_budget": 1}
+    assert token_cost([7], budget=8)["p50"] == 7
+
+
+@pytest.mark.parametrize("generated,budget", [([], 8), ([9], 8), ([-1], 8), ([1.5], 8), ([1], 0)])
+def test_token_cost_rejects_invalid_counts(generated, budget):
+    with pytest.raises(ValueError):
+        token_cost(generated, budget=budget)

@@ -276,15 +276,17 @@ generators = [
 generator_terms = "SÌ"
 generator_terms_note = "Tracce da modelli mit/apache-2.0; con gli stessi filtri di aegis2-train (righe refusal_data_augmentation fuori, llm_jury marcate) restano i termini di aegis2-train. Lo split topic_control_reasoning (CantTalkAboutThis) resta fuori da questa voce."
 filters = [
-  "solo split nemotron_content_safety_reasoning",
-  "righe refusal_data_augmentation escluse; label llm_jury marcate needs_relabel",
+  "solo split nemotron_content_safety_reasoning (file aegis_v2_efficient_reasoning.jsonl, digest verificato)",
+  "righe refusal_data_augmentation e prompt REDACTED escluse",
+  "solo righe senza risposta (superficie prompt, label umane): la traccia giudica insieme prompt e risposta",
+  "tracce complete safety_reasoning_*; tenute solo se il verdetto finale (Prompt harm) coincide con la label",
   "deduplica contro tutti i benchmark del manifest",
 ]
 title = "Nemotron Content Safety Reasoning Dataset"
 authors = "NVIDIA; Sreedhar, M. N., Rebedea, T., Parisien, C., «Safety Through Reasoning: An Empirical Study of Reasoning Guardrail Models»"
 url = "https://huggingface.co/datasets/nvidia/Nemotron-Content-Safety-Reasoning-Dataset"
-changes = "nessun convertitore ancora"
-risks = ["duplica le righe di Aegis 2.0: deduplicare tra fonti", "tracce allineate a label llm_jury non ancora rietichettate"]
+changes = "scudo.reasoning_data: label safe/unsafe del prompt mappate a NO_VIOLATION/VIOLATION, criterio HARMFUL_REQUEST, ragionamento estratto da <think> senza la riga finale, formato scudo.reasoned-decision/1"
+risks = ["duplica le righe di Aegis 2.0: deduplicare tra fonti", "le tracce citano la tassonomia Aegis (S1-S22) e a volte la risposta assente, che il prompt non contiene", "lingua dichiarata inglese ma con qualche prompt in altre lingue"]
 
 # --- Training: prompt injection e jailbreak ---------------------------------
 

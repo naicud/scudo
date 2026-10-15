@@ -57,6 +57,8 @@ UNCONVERTED = {
     "Lakera/mosscap_prompt_injection": (
         "nessuna label per riga: il README avverte che molti prompt non sono injection e "
         "l'unico esito (password rivelata) viene dalle risposte ChatGPT escluse"),
+    "nvidia/Nemotron-Content-Safety-Reasoning-Dataset": (
+        "righe con ragionamento dell'Accurate, non casi: python -m scudo.reasoning_data build"),
 }
 Loader = Callable[[Entry, str], Iterable[dict]]
 DEDUP_PARAMS = {"normalize": "NFKC+casefold+punteggiatura", "exact": "sha256",
@@ -107,7 +109,7 @@ def load_rows(entry: Entry, split: str, *, cache_dir: Path) -> Iterable[dict]:
                         cache_dir=str(cache_dir / "datasets"))
 
 
-def _index(entries: list[Entry], loader: Loader) -> Index:
+def benchmark_index(entries: list[Entry], loader: Loader) -> Index:
     """Testi dei benchmark; con un convertitore anche le evidenze nella forma del training."""
     index = Index()
     for bench in entries:
@@ -167,7 +169,7 @@ def build(out: Path, *, entries: list[Entry] | None = None, loader: Loader | Non
     out = check_outside_repo(out)
     out.mkdir(parents=True, exist_ok=True)
     loader = loader or partial(load_rows, cache_dir=out / "hf-cache")
-    index = _index(benchmarks(entries), loader)
+    index = benchmark_index(benchmarks(entries), loader)
     report = {
         "manifest_sha256": digest,
         "dedup": dict(DEDUP_PARAMS),

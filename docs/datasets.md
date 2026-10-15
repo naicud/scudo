@@ -92,6 +92,64 @@ Per il costruttore del mix:
 - conflitti di label sullo stesso testo: 39 testi sono sia jailbreak sia
   regular in in-the-wild, 12 jailbreak di jackhhao sono regular in in-the-wild.
 
+## Ragionamenti dell'Accurate
+
+`Case` non porta un ragionamento: le fonti con ragionamenti seguono un
+percorso parallelo, `scudo.reasoning_data` (in `report.json` dell'ingestione
+compaiono in `not_ingested` con il comando da usare).
+
+```sh
+rtk proxy uv run --extra train python -m scudo.reasoning_data build --out /percorso/autorizzato [--extra teacher.jsonl ...]
+```
+
+Stesso cancello del manifest, stessa cartella fuori dal repository, stesso
+indice dei benchmark. Da `nvidia/Nemotron-Content-Safety-Reasoning-Dataset`
+(revisione `792b0715f519c0750d63b73af2bf33ddd9ac3887`) legge il file
+`aegis_v2_efficient_reasoning.jsonl` dello split
+`nemotron_content_safety_reasoning`, con digest SHA-256 verificato. Schema
+(20 colonne, letto da README e datasets-server): le 9 colonne di Aegis 2.0,
+`prompt_harm_label` e `response_harm_label` (`harmful`/`unharmful`, identiche
+alle label), e per ogni generatore (`deepseek_r1_0528`, `gpt_oss_120b`,
+`qwen3_32b`) `safety_reasoning_*` (traccia completa), `efficient_reasoning_*`
+(ridotta) e `prediction_gt_mismatch_*`.
+
+Regole:
+
+- restano fuori `refusal_data_augmentation`, i prompt `REDACTED` e le righe con
+  una risposta: la traccia giudica insieme prompt e risposta, mentre
+  l'evidenza della superficie `response` è la sola risposta. Resta la
+  superficie `prompt` (label umane), criterio `HARMFUL_REQUEST`;
+- la traccia è `<think>…</think>` seguita da `Prompt harm: harmful|unharmful`
+  e `Response harm: …`; il verdetto della traccia è la riga `Prompt harm`
+  (`harmful` → VIOLATION). Il ragionamento è il testo dentro `<think>`. Una
+  traccia senza questa forma o con ragionamento vuoto esce con il motivo in
+  `trace_dropped`;
+- accordo con la label: una traccia il cui verdetto non coincide con il gold
+  esce e si conta in `disagree`. Il campo `prediction_gt_mismatch_*` non si
+  usa: riguarda l'uscita congiunta prompt+risposta;
+- si usano le tracce complete: le `efficient_reasoning_*` spesso non hanno il
+  verdetto finale, quindi non si può verificare l'accordo.
+
+Ogni riga di `reasoning.jsonl` è un `ReasoningRecord` (`source`, `source_id`,
+`language`, `surface`, `criterion`, `evidence`, `verdict`, `reasoning`,
+`trace_verdict`, `generator`) più `format`, `prompt`, `completion` e
+`semantic_ids` del formato reasoned-decision. I file `--extra` (ragionamenti
+italiani del teacher, issue #7) contengono esattamente i campi di
+`ReasoningRecord`: fonte, id e generatore sono obbligatori; un record non
+valido ferma la build con file e riga; il disaccordo con la label e i
+duplicati dei benchmark escono contati, come per Nemotron.
+`reasoning-report.json` riporta per fonte righe, scarti per motivo, tracce,
+disaccordi, rimossi per benchmark e tenuti per generatore e verdetto; ha anche
+`manifest_sha256`, `dedup` e `benchmarks` come il report di ingestione, quindi
+`python -m scudo.ingest verify --report reasoning-report.json` ne verifica la
+deduplica contro tutto il registro.
+
+Smoke sul file reale (fuori dal repository, senza deduplica): 27.459 righe;
+escluse 9.431 con risposta e 3.363 `refusal_data_augmentation`; 43.281 tracce
+leggibili, 714 scartate (708 vuote, 4 con verdetto illeggibile, 2 senza
+`</think>`), 2.742 in disaccordo; restano 40.539 ragionamenti prima della
+deduplica.
+
 ## Deduplica contro i benchmark
 
 `scudo.dedup` (solo standard library, deterministico) indicizza i campi di

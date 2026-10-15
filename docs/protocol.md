@@ -2,7 +2,7 @@
 
 Formato versionato condiviso da training e serving. Il termine **criterio
 semantico**, i verdetti e le superfici seguono [`CONTEXT.md`](../CONTEXT.md).
-Fonte: `src/scudo/protocol.py`, `src/scudo/cases.py`, `src/scudo/nemotron.py`,
+Fonte: `src/scudo/protocol.py`, `src/scudo/reasoned.py`, `src/scudo/cases.py`, `src/scudo/nemotron.py`,
 `src/scudo/artifacts.py`, `src/scudo/eval_report.py`; il golden è in
 `tests/test_protocol.py`.
 
@@ -84,6 +84,104 @@ Un readout malformato è un errore: meno o più di tre logit, valori non finiti
 o permutazione invalida. Non diventa mai `NO_VIOLATION`. Un timeout o un
 errore del provider non diventano un verdetto.
 
+## Formato reasoned-decision (Accurate)
+
+`scudo.reasoned-decision/1` (`REASONED_FORMAT_VERSION`, `src/scudo/reasoned.py`,
+test in `tests/test_reasoned.py`). Stesso JSON di criterio, evidenza e opzioni
+del decision-token, quindi gli score delle opzioni significano la stessa cosa;
+cambia solo ciò che segue il prompt. La versione cambia con qualsiasi modifica
+ai byte di prompt, frame o completamento.
+
+Byte (`\n` reali):
+
+- prompt: `render_prompt(...)` (finisce con `\nDecision:\n`) + `Reasoning:\n`;
+- completamento di training: `<ragionamento>` + `\n</reasoning>\n` +
+  `Answer:\n` + la lettera del gold.
+
+Esempio di sequenza completa:
+
+```
+{"criterion": ..., "untrusted_evidence": ..., "options": {...}}
+Decision:
+Reasoning:
+The user asks how to poison a neighbour: criminal planning and violence.
+</reasoning>
+Answer:
+B
+```
+
+Il ragionamento di training non è vuoto, non ha spazi ai bordi, non contiene
+`</reasoning>` né NUL (`check_reasoning`). Il gold compare solo nella lettera.
+
+### Frame nativo e serving
+
+Il formato è il frame `reasoning` del backend nativo di open-guard (letto nel
+checkout locale a `2ed1e92`: `docs/native.md` § Ragionamento limitato,
+`src/open_guard/native/reasoning.c`, `scoring/decision_token.py`):
+
+```json
+{"max_new_tokens": 512, "reasoning_prefix": "Reasoning:\n", "stop_sequence": "\n</reasoning>\n", "answer_prefix": "Answer:\n"}
+```
+
+Il serving deve:
+
+1. tokenizzare il prompt decision-token e `Reasoning:\n` separatamente e
+   verificare che la concatenazione sia esatta;
+2. generare in modo greedy al massimo `MAX_NEW_TOKENS` = 512 token
+   (stop sequence compresa) e fermarsi sul token che completa
+   `\n</reasoning>\n` nel testo reso senza token speciali; l'end-of-generation
+   non entra nel contesto;
+3. decodificare i token di `Answer:\n` e leggere i logit di `A`, `B`, `C`
+   nell'ultima posizione, poi `read_options` come nel decision-token.
+
+Sul tokenizer di `Qwen/Qwen3.5-9B` alla revisione fissata
+(`c202236235762e1c871ad0ccb60c8ee5ba337b9a`) le lettere sono token singoli
+(32, 33, 34), `prompt + Reasoning:\n` e `Answer:\n + lettera` sono concatenazioni
+esatte, e i confini prefisso/ragionamento e stop/`Answer:\n` reggono su tutte
+le 43.281 tracce leggibili di Nemotron Content Safety Reasoning (ragionamento
+più stop: media 195 token, p99 376, 65 oltre il budget di 512, che il notebook
+scarta). Il notebook ripete questi controlli per ogni riga con il prompt reale.
+La stessa sequenza la segue l'eval locale (`scudo.reasoned_runner`):
+`tokens_through_stop` taglia i token oltre lo stop come il bridge.
+
+### Errori, mai verdetti
+
+Scudo è un sensore: per questi casi non emette alcun verdetto, riporta un
+errore. È il gateway che mappa ogni errore a REVIEW, mai ad ALLOW; Scudo non
+emette mai ALLOW o REVIEW.
+
+- `REASONING_TRUNCATED`: stop assente dopo `max_new_tokens` token;
+- `REASONING_NO_STOP`: generazione finita prima dello stop;
+- `REASONING_EMPTY`: nessun testo prima dello stop;
+- `REASONING_OVER_BUDGET`: più token generati del budget;
+- `TOKENIZER_UNSUPPORTED`: confine di token del frame non esatto;
+- readout malformato (logit non finiti, permutazione invalida) come nel
+  decision-token. Timeout ed errori del provider non diventano mai un verdetto.
+
+Nell'eval questi errori entrano nella colonna `ERROR` e contano come sbagli.
+
+### Cosa supporta oggi open-guard e cosa deve aggiungere
+
+Il backend nativo sa già generare e poi leggere gli score delle opzioni:
+export `og_read_reasoning_v1`, generazione greedy limitata con stop sequence,
+`answer_prefix` e lettura di A/B/C (`ReasoningUsage` con token generati). Per
+servire questo formato con il contratto di Scudo deve ancora:
+
+- trattare la fine della generazione senza stop sequence (`stop_kind` END)
+  come errore: oggi legge comunque le opzioni e il risultato non porta alcun
+  motivo di incertezza;
+- trattare il budget esaurito come errore: oggi produce una lettura con
+  `REASONING_TRUNCATED`, che esclude ALLOW ma resta un verdetto;
+- accettare il testo del criterio di Scudo nel renderer (limite già descritto
+  sopra per il Fast), oppure servire i prompt renderizzati da
+  `scudo.reasoned.render_reasoned_prompt`.
+
+Il confronto live: il GGUF nel backend nativo con il frame sopra, sugli stessi
+prompt di `readouts_local.json` del notebook, confrontato con
+`compare_readouts`. Il bridge non restituisce il testo generato: se la
+generazione greedy diverge fra checkpoint e GGUF, i logit possono differire
+anche con readout corretto, e il confronto lo mostra come `FAIL`.
+
 ## Evidenza per superficie
 
 | Superficie | Input del criterio | `untrusted_evidence` |
@@ -164,7 +262,8 @@ non verificato.
 
 Ogni gruppo riporta casi, errori, accuratezza, recall, precision e F1 per
 verdetto, la matrice di confusione con una colonna `ERROR`, la calibrazione e
-l'over-refusal. Definizioni in [`eval.md`](eval.md).
+l'over-refusal. Un modello che ragiona aggiunge `token_cost`. Definizioni in
+[`eval.md`](eval.md).
 
 Il confronto fra checkpoint e GGUF usa `compare_readouts(local, live, tolerance=...)`:
 
