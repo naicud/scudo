@@ -140,10 +140,15 @@ risks = [
   "se la clausola Llama 3.1 si applicasse, il nome del modello pubblicato dovrebbe iniziare con «Llama»",
 ]
 
+[dataset.decision]
+by = "naicud"
+on = "2026-10-15"
+rationale = "Ammessa con rischio registrato: è la fonte principale di italiano con licenza commerciale. Rischi aperti: traduzione con Google Cloud Translation (Service Specific Terms §17 sui modelli concorrenti) e filtri con modelli Llama 3.1 (clausola sul nome). Le label llm_jury restano marcate needs_relabel e non entrano come gold; da rivedere prima della pubblicazione dei pesi."
+
 [[dataset]]
 name = "nemotron-sft-safety-v2"
 id = "nvidia/Nemotron-SFT-Safety-v2"
-role = "train"
+role = "excluded"
 revision = "8a40a63c9a1a340874b874f980953be53bff0a07"
 read_on = "2026-10-15"
 config = "default"
@@ -170,6 +175,11 @@ authors = "NVIDIA Corporation"
 url = "https://huggingface.co/datasets/nvidia/Nemotron-SFT-Safety-v2"
 changes = "nessun convertitore ancora"
 risks = ["dati SFT di allineamento, non di classificazione", "italiano tradotto da Riva-Translate: output vietati per addestrare altri modelli senza approvazione scritta di NVIDIA", "prompt condivisi con Aegis 2.0 e Gretel"]
+
+[dataset.decision]
+by = "naicud"
+on = "2026-10-15"
+rationale = "Esclusa: tutte le righe tradotte usano nvidia/Riva-Translate-4B-Instruct-v1.1, la cui NVIDIA Community Model License vieta di usare gli output per sviluppare altri modelli senza approvazione scritta di NVIDIA. Riammissibile solo con approvazione NVIDIA o con il solo sottoinsieme inglese, oggi INCERTO."
 
 [[dataset]]
 name = "aya-redteaming-en"
@@ -299,7 +309,7 @@ risks = ["duplica le righe di Aegis 2.0: deduplicare tra fonti", "le tracce cita
 [[dataset]]
 name = "deepset-prompt-injections"
 id = "deepset/prompt-injections"
-role = "train"
+role = "excluded"
 revision = "4f61ecb038e9c3fb77e21034b22511b523772cdd"
 read_on = "2026-10-15"
 config = "default"
@@ -320,6 +330,11 @@ authors = "deepset"
 url = "https://huggingface.co/datasets/deepset/prompt-injections"
 changes = "nessun convertitore ancora"
 risks = ["provenienza ignota", "lingua non dichiarata nei metadati, ma il blog dichiara traduzioni (traduttore ignoto)"]
+
+[dataset.decision]
+by = "naicud"
+on = "2026-10-15"
+rationale = "Esclusa: provenienza dei prompt e traduttore non dichiarati da deepset (blog del dataset). Fonte piccola e sostituibile."
 
 [[dataset]]
 name = "llmail-inject"
@@ -390,7 +405,7 @@ risks = ["label assenti", "possibili dati personali nei prompt"]
 [[dataset]]
 name = "gandalf-ignore-instructions"
 id = "Lakera/gandalf_ignore_instructions"
-role = "train"
+role = "excluded"
 revision = "04737b65e90a6794ec227012e4a255a7def6344b"
 read_on = "2026-10-15"
 config = "default"
@@ -414,6 +429,11 @@ authors = "Lakera; Pfister, N., Volhejn, V., Knott, M., Arias, S., et al., «Gan
 url = "https://huggingface.co/datasets/Lakera/gandalf_ignore_instructions"
 changes = "nessun convertitore ancora"
 risks = ["solo positivi", "rumore dichiarato dalla selezione automatica"]
+
+[dataset.decision]
+by = "naicud"
+on = "2026-10-15"
+rationale = "Esclusa: le righe sono selezionate con embedding OpenAI, i cui termini vietano di usare l'output per sviluppare modelli concorrenti distribuiti. Fonte piccola e sostituibile con mosscap/in-the-wild."
 
 [[dataset]]
 name = "in-the-wild-jailbreak"
@@ -481,7 +501,7 @@ risks = [
 [[dataset]]
 name = "yanismiraoui-prompt-injections"
 id = "yanismiraoui/prompt_injections"
-role = "train"
+role = "excluded"
 revision = "bd55359f2f332afc35f277ac3dd08f7111b024c9"
 read_on = "2026-10-15"
 config = "default"
@@ -502,6 +522,11 @@ authors = "Yanis Miraoui"
 url = "https://huggingface.co/datasets/yanismiraoui/prompt_injections"
 changes = "nessun convertitore ancora"
 risks = ["solo positivi", "lingua non annotata per riga"]
+
+[dataset.decision]
+by = "naicud"
+on = "2026-10-15"
+rationale = "Esclusa: autore, origine dei prompt e traduttore delle sette lingue non dichiarati (verifica sulle fonti primarie del 2026-10-15). Fonte piccola e sostituibile; l'iniezione diretta IT arriva da #7."
 
 [[dataset]]
 name = "jackhhao-jailbreak"
@@ -763,7 +788,7 @@ text_fields = ["prompt"]
 [[dataset]]
 name = "wildguardtest"
 id = "allenai/wildguardmix"
-role = "benchmark"
+role = "excluded"
 revision = "d29c47f41c8b51348b5c8e8c81c039b3132b66d1"
 read_on = "2026-10-15"
 config = "wildguardtest"
@@ -788,6 +813,11 @@ risks = [
   "una casella chiede «I agree to use this dataset for research purposes in accordance with the AI2 Responsible Use Guidelines»: la compatibilità con la valutazione di un modello pubblicato la decide la persona",
 ]
 # text_fields assente: schema NON VERIFICATO, il cancello blocca la build.
+
+[dataset.decision]
+by = "naicud"
+on = "2026-10-15"
+rationale = "Esclusa dal registro finché l'account non richiede l'accesso gated di allenai/wildguardmix: il modulo AI2 chiede di dichiarare uso di ricerca, da valutare rispetto alla pubblicazione Apache-2.0. Senza schema verificato bloccava l'intera build; si reintegra come benchmark quando campi di testo e termini sono verificati."
 
 [[dataset]]
 name = "toxicchat-test"

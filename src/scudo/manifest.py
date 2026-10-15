@@ -9,6 +9,9 @@ generatori `NO`; `INCERTO` blocca finché la voce non porta una decisione umana
 (chi, quando, motivazione). I benchmark servono solo alla valutazione: una
 licenza NC è ammessa, i termini dei generatori non bloccano, ma servono i campi
 di testo su cui deduplicare. Il registro dei benchmark è `benchmarks()`.
+Una voce `excluded` resta nel manifest come documentazione (data card e
+motivo) ma non entra né nel training né nei benchmark: richiede solo una
+decisione umana completa.
 """
 
 import re
@@ -22,7 +25,7 @@ from scudo.cases import SURFACES
 MANIFEST = resources.files("scudo") / "manifest.toml"
 TRAIN_LICENSES = frozenset({"apache-2.0", "mit", "cc0-1.0", "cc-by-4.0", "odc-by"})
 EVAL_ONLY_LICENSES = frozenset({"cc-by-nc-4.0"})  # mai nel training
-ROLES = ("train", "benchmark")
+ROLES = ("train", "benchmark", "excluded")
 GENERATOR_TERMS = ("SÌ", "NO", "INCERTO")
 _SHA = re.compile(r"[0-9a-f]{40}")
 _CARD_FIELDS = ("id", "read_on", "config", "license_source", "texts_by", "labels_by",
@@ -99,6 +102,9 @@ def load(path: Path | None = None) -> list[Entry]:
 
 
 def _problems(entry: Entry) -> list[str]:
+    if entry.role == "excluded":
+        complete = entry.decision and entry.decision.complete()
+        return [] if complete else ["esclusa senza decisione umana (chi, quando, perché)"]
     out = []
     if entry.role not in ROLES:
         out.append(f"ruolo {entry.role!r} non in {ROLES}")

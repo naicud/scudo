@@ -141,8 +141,10 @@ def test_open_jev_passes_the_gate_once_its_procedural_teacher_is_verified():
 
 def test_registry_lists_the_held_out_benchmarks():
     names = {entry.name for entry in benchmarks()}
-    assert {"aegis2-test", "nemotron3-test", "xstest", "wildguardtest", "toxicchat-test",
+    assert {"aegis2-test", "nemotron3-test", "xstest", "toxicchat-test",
             "jbb-behaviors", "orbench-hard", "canttalk-test", "open-jev-heldout"} <= names
+    excluded = {entry.name for entry in load() if entry.role == "excluded"}
+    assert {"wildguardtest", "nemotron-sft-safety-v2"} <= excluded
     assert all(entry.role == "benchmark" for entry in benchmarks())
     assert all(entry.role == "train" for entry in training())
 
@@ -154,3 +156,17 @@ def test_training_entry_is_found_by_dataset_id_and_split():
     assert training_entry(entries, "org/demo", "train") == TRAIN
     assert training_entry(entries, "org/demo", "test") is None  # solo benchmark
     assert training_entry(entries, "org/other", "train") is None
+
+
+def test_excluded_source_with_a_human_decision_does_not_block_and_is_never_used():
+    excluded = replace(TRAIN, name="demo-excluded", role="excluded", generator_terms="NO",
+                       gated=True, text_fields=(), decision=DECISION)
+    assert blocked(excluded, TRAIN, BENCH) == []
+    assert training([excluded, TRAIN, BENCH]) == [TRAIN]
+    assert benchmarks([excluded, TRAIN, BENCH]) == [BENCH]
+
+
+def test_excluded_source_needs_a_complete_human_decision():
+    excluded = replace(TRAIN, role="excluded")
+    assert "decisione" in blocked(excluded)[0]
+    assert blocked(replace(excluded, decision=replace(DECISION, by=" ")))

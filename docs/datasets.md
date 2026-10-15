@@ -23,6 +23,15 @@ dell'[ADR 0002](adr/0002-generalisti-pubblici-apache-addestrati-su-colab.md)):
 - benchmark senza campi di testo verificati su cui deduplicare;
 - uno split held-out usato anche per il training; nomi duplicati.
 
+Una voce con `role = "excluded"` resta nel manifest come documentazione (data
+card e motivo dell'esclusione) e non entra né nel training né nel registro dei
+benchmark. Non blocca la build, ma richiede la stessa tabella `decision`
+completa. Al 2026-10-15 sono escluse `nemotron-sft-safety-v2` (termini Riva
+`NO`), `deepset-prompt-injections`, `gandalf-ignore-instructions`,
+`yanismiraoui-prompt-injections` (provenienza non verificabile o termini
+OpenAI) e `wildguardtest` (accesso gated non richiesto); `nemotron3-train`
+resta nel training con decisione e rischio registrati.
+
 `python -m scudo.ingest check` stampa i motivi di blocco ed esce con 1.
 
 ## Build

@@ -210,15 +210,15 @@ def test_verify_fails_on_other_manifest_or_other_dedup_parameters(tmp_path):
     assert "parametri" in problem
 
 
-def test_shipped_registry_requires_wildguardtest_in_the_dedup_report():
-    # Oggi il cancello blocca la build (WildGuardTest senza campi verificati): nessun
-    # report passa la verifica finché WildGuardTest non è indicizzato.
-    indexed = {b.name: {"texts": 10} for b in benchmarks() if b.name != "wildguardtest"}
+def test_shipped_registry_requires_every_benchmark_in_the_dedup_report():
+    names = [b.name for b in benchmarks()]
     report = {"manifest_sha256": manifest_digest(), "dedup": dict(DEDUP_PARAMS),
-              "benchmarks": indexed}
+              "benchmarks": {name: {"texts": 10} for name in names}}
+    assert verify_dedup(report)["status"] == "PASS"
+    del report["benchmarks"][names[0]]
     result = verify_dedup(report)
     assert result["status"] == "FAIL"
-    assert result["problems"] == ["wildguardtest: non indicizzato dalla deduplica"]
+    assert result["problems"] == [f"{names[0]}: non indicizzato dalla deduplica"]
 
 
 def test_verify_cli_exits_one_on_fail(tmp_path, capsys):

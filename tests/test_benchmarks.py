@@ -38,22 +38,14 @@ def by_surface(loaded):
     return {(case.source_id, case.surface): case.verdict for case in loaded.cases}
 
 
-def test_every_registry_benchmark_has_a_converter_or_an_explicit_refusal():
+def test_every_registry_benchmark_has_a_converter():
     for entry in benchmarks():
-        if entry.name == "wildguardtest":
-            with pytest.raises(BenchmarkError) as error:
-                load_cases(entry, no_download)
-            assert error.value.code == "SCHEMA_NOT_VERIFIED"
-        else:
-            check(entry)
-    assert set(CONVERTERS) == {entry.name for entry in benchmarks()} - {"wildguardtest"}
+        check(entry)
+    assert set(CONVERTERS) == {entry.name for entry in benchmarks()}
 
 
-def test_wildguardtest_stays_refused_even_with_text_fields_but_no_verified_converter():
-    entry = replace(REGISTRY["wildguardtest"], text_fields=("prompt",))
-    with pytest.raises(BenchmarkError) as error:
-        load_cases(entry, no_download)
-    assert error.value.code == "NO_CONVERTER"
+def test_excluded_wildguardtest_is_not_in_the_registry():
+    assert "wildguardtest" not in REGISTRY
 
 
 def test_a_revision_other_than_the_verified_one_is_refused_before_download():
