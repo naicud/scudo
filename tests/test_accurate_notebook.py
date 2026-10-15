@@ -45,9 +45,9 @@ def test_notebook_pins_base_and_data_and_verifies_weights_before_loading():
     assert "verify_dedup(data_report)" in source
 
 
-def test_training_is_qlora_with_completion_only_loss_and_guarded_resume():
+def test_training_is_bf16_lora_with_completion_only_loss_and_guarded_resume():
     source = text()
-    assert '"load_in_4bit": True' in source
+    assert '"load_in_4bit": False' in source  # Unsloth sconsiglia QLoRA su Qwen3.5
     assert "completion_only_loss=True" in source
     assert "resume_from_checkpoint=resume" in source
     assert "run_config.json" in source and "RUN_FINGERPRINT" in source

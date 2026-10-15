@@ -27,10 +27,10 @@ Prerequisiti:
   riprende da `last-checkpoint` sul checkpoint repo, solo con la stessa
   configurazione e gli stessi dati.
 
-Attenzione: la documentazione Unsloth sconsiglia QLoRA 4-bit su Qwen3.5
-("higher than normal quantization differences"). Il ticket chiede QLoRA;
-`RUN["load_in_4bit"] = False` passa a LoRA bf16 (circa 22 GB per il 9B secondo
-Unsloth). La scelta e' della persona che lancia il run.
+LoRA bf16, non QLoRA: la documentazione Unsloth sconsiglia QLoRA 4-bit su
+Qwen3.5 ("higher than normal quantization differences") e il 9B in bf16 sta in
+circa 22 GB secondo Unsloth, quindi su una A100 40 GB. Il ticket chiedeva QLoRA;
+la scelta e' registrata nell'issue #9. `RUN["load_in_4bit"] = True` torna a QLoRA.
 
 Questo notebook e' una prova locale (checkpoint in training), non la prova live
 nel backend nativo."""
@@ -57,7 +57,7 @@ RUN = {
     "checkpoint_repo": "Naicud/scudo-accurate-checkpoints",
     "save_steps": 100,
     "max_seq_length": 2048,
-    "load_in_4bit": True,  # ticket #9; vedi l'avvertenza Unsloth nell'introduzione
+    "load_in_4bit": False,  # LoRA bf16: Unsloth sconsiglia QLoRA su Qwen3.5 (introduzione)
     "learning_rate": 2e-4,
     "batch_size": 4,
     "grad_accum": 4,
