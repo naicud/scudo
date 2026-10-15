@@ -1,0 +1,9 @@
+repos:
+  - repo: local
+    hooks:
+      - id: check-no-artifacts
+        name: nessun dato, peso o token
+        entry: uv run --no-sync python scripts/check_no_artifacts.py
+        language: system
+        pass_filenames: false
+        always_run: true

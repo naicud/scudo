@@ -1,0 +1,52 @@
+# Sistema e ambiente
+._*
+.DS_Store
+.venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.ruff_cache/
+.uv-cache/
+dist/
+build/
+.ipynb_checkpoints/
+
+# Segreti
+.env
+.env.*
+*.pem
+*.key
+.netrc
+.huggingface/
+hf_token*
+
+# Dati: restano nel perimetro autorizzato, non nel repository
+data/
+datasets/
+*.parquet
+*.jsonl
+*.arrow
+*.csv
+*.tsv
+!tests/fixtures/**/*.jsonl
+
+# Pesi, checkpoint e output di training
+*.safetensors
+*.gguf
+*.bin
+*.pt
+*.pth
+*.ckpt
+*.onnx
+*.npz
+checkpoints/
+outputs/
+runs/
+wandb/
+mlruns/
+unsloth_compiled_cache/
+
+# Cache Hugging Face
+.cache/
+hf_cache/
+huggingface/
